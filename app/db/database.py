@@ -1,28 +1,20 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///books.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///bookai.db")
 
-engine = create_async_engine(
-    SQLALCHEMY_DATABASE_URL,
-    future=True,
-    echo=True
-)
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
-)
-
+engine = create_async_engine(DATABASE_URL, echo=True)
+SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
 async def get_db():
     async with SessionLocal() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()

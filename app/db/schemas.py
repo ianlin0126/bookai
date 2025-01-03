@@ -87,3 +87,10 @@ class Visit(VisitBase):
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat()
         }
+
+class OpenLibrarySearchResult(BaseModel):
+    """Schema for OpenLibrary search results."""
+    title: str
+    author_name: Optional[str] = None
+    author_key: Optional[str] = None
+    key: str

@@ -1,126 +1,119 @@
 import asyncio
 import sys
 import os
+import json
 import time
-from typing import Optional, Dict, Any
-from sqlalchemy import select, or_
+from typing import Dict, Any, Optional
 
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Now we can import app modules
 from app.db.database import SessionLocal
-from app.services import search_service, book_service
-from app.db.models import Author
-from popular_books import POPULAR_BOOKS
+from app.db.models import Book, Author
+from app.services.search_service import search_books
+from app.services.book_service import create_book_with_author
 
-async def process_book(db, title: str) -> Optional[Dict[str, Any]]:
-    """Process a single book."""
+async def process_book(db, title: str) -> Optional[Book]:
+    """Process a single book: search and add to database."""
     try:
-        print(f"\nSearching for book: {title}")
-        # Search Open Library API
-        results = await search_service.search_books(db, title, 1, 1)
+        print(f"Searching for book: {title}")
+        
+        # Search for book in OpenLibrary
+        results = await search_books(db, title, 1, 1)
         
         if not results:
             print(f"No results found for: {title}")
             return None
-        
+
         book_data = results[0]
         print(f"[DEBUG] Book data from search: {book_data}")
         
-        open_library_key = book_data.get("open_library_key")
-        if not open_library_key:
-            print(f"No Open Library key found for: {title}")
+        # Check for required fields
+        if not book_data.get('open_library_key') or not book_data.get('author_key'):
+            print(f"Missing required OpenLibrary keys for: {title}")
             return None
+
+        print(f"Found Open Library key: {book_data['open_library_key']}")
         
-        print(f"Found Open Library key: {open_library_key}")
-        
-        # Add book to database
+        # Create book with author using book service
         try:
-            # Create author with Open Library key if available
-            author_name = book_data.get("author")
-            author_key = book_data.get("author_key")
-            
-            # Find or create author
-            query = select(Author)
-            if author_key:
-                # If we have an author key, use that as the primary lookup
-                query = query.where(Author.open_library_key == author_key)
-                result = await db.execute(query)
-                author = result.scalar_one_or_none()
-                
-                if not author:
-                    # Try finding exact name match if key lookup failed
-                    query = select(Author).where(
-                        Author.name == author_name,
-                        Author.open_library_key.is_(None)  # Only match authors without a key
-                    )
-                    result = await db.execute(query)
-                    author = result.scalar_one_or_none()
-            else:
-                # If no author key, only look up by exact name match for authors without keys
-                query = select(Author).where(
-                    Author.name == author_name,
-                    Author.open_library_key.is_(None)
-                )
-                result = await db.execute(query)
-                author = result.scalar_one_or_none()
-            
-            if not author:
-                print(f"[DEBUG] Creating new author: {author_name}")
-                author = Author(
-                    name=author_name,
-                    open_library_key=author_key
-                )
-                db.add(author)
-                await db.commit()
-                await db.refresh(author)
-            
-            # Create book with author
-            book = await book_service.create_book_with_author(
-                db,
-                title=book_data.get("title"),
-                author_name=author_name,
-                open_library_key=open_library_key,
-                cover_image_url=book_data.get("cover_image_url"),
-                publication_year=book_data.get("publication_year")
+            book = await create_book_with_author(
+                db=db,
+                title=book_data['title'],
+                author_name=book_data['author'],
+                author_key=book_data['author_key'],
+                open_library_key=book_data['open_library_key'],
+                cover_image_url=book_data.get('cover_image_url'),
+                publication_year=book_data.get('publication_year')
             )
-            print(f"Added book: {book.title} by {book.author.name if book.author else 'Unknown Author'}")
-            return book_data
-        except Exception as e:
-            print(f"Error adding book {title}: {str(e)}")
+            print(f"Added book: {book.title} by {book.author.name}")
+            return book
+            
+        except ValueError as e:
+            print(f"Error creating book: {str(e)}")
             return None
-        
+            
     except Exception as e:
-        print(f"Error processing {title}: {str(e)}")
+        print(f"Error processing book {title}: {str(e)}")
         return None
 
 async def bootstrap_books():
-    """Add popular books to the database."""
+    """Add initial set of books to the database."""
+    books_to_add = [
+        "To Kill a Mockingbird",
+        "1984",
+        "The Great Gatsby",
+        "Pride and Prejudice",
+        "The Catcher in the Rye",
+        "The Hobbit",
+        "Harry Potter and the Sorcerer's Stone",
+        "The Lord of the Rings: The Fellowship of the Ring",
+        "The Diary of a Young Girl",
+        "Moby-Dick",
+        "The Hunger Games",
+        "The Alchemist",
+        "The Da Vinci Code",
+        "The Road",
+        "Brave New World",
+        "The Grapes of Wrath",
+        "The Little Prince",
+        "One Hundred Years of Solitude",
+        "Animal Farm",
+        "The Book Thief",
+        "Lord of the Flies",
+        "The Chronicles of Narnia",
+        "Gone with the Wind",
+        "The Shining",
+        "The Outsiders",
+        "The Odyssey",
+        "Fahrenheit 451",
+        "The Handmaid's Tale"
+    ]
+
     async with SessionLocal() as db:
-        total_books = len(POPULAR_BOOKS)
-        successful = 0
-        failed = 0
-        
-        for i, title in enumerate(POPULAR_BOOKS, 1):
-            print(f"\nProcessing book {i}/{total_books}: {title}")
-            
-            result = await process_book(db, title)
-            if result:
-                successful += 1
-            else:
-                failed += 1
-            
-            # Add a small delay to avoid rate limiting
-            await asyncio.sleep(1)
-        
-        print(f"\nBootstrap complete!")
-        print(f"Total books processed: {total_books}")
-        print(f"Successfully added: {successful}")
-        print(f"Failed to add: {failed}")
+        start_time = time.time()
+        success_count = 0
+        fail_count = 0
+
+        for i, title in enumerate(books_to_add, 1):
+            print(f"\nProcessing book {i}/{len(books_to_add)}: {title}")
+            try:
+                if await process_book(db, title):
+                    success_count += 1
+                    await db.commit()
+                else:
+                    fail_count += 1
+            except Exception as e:
+                print(f"Error processing book {title}: {str(e)}")
+                await db.rollback()
+                fail_count += 1
+
+        total_time = time.time() - start_time
+        print("\nBootstrap complete!")
+        print(f"Total books processed: {len(books_to_add)}")
+        print(f"Successfully added: {success_count}")
+        print(f"Failed to add: {fail_count}")
+        print(f"\nTotal time: {total_time:.2f} seconds")
 
 if __name__ == "__main__":
-    start_time = time.time()
     asyncio.run(bootstrap_books())
-    end_time = time.time()
-    print(f"\nTotal time: {end_time - start_time:.2f} seconds")

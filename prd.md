@@ -2,17 +2,22 @@
 
 # Problem
 
-Busy people don’t have time to read books, and would like a TL;DR: of recommended books to get a high level idea, and collect enough signals to decide whether this is a book worth the read.
+Busy people don’t have time to read books, and would like a simple format to get the TL;DR: of recommended books to get a high level idea, and collect enough signals to decide whether this is a book worth the read.
 
 ---
 
 # Proposal
 
-Instead of relying on friends’ recommendation or book review sites, rely on LLMs Google Gemini and ChatGPT to generate generate book summaries as well as recommend a list of questions to get to learn more about the book. This differentiates from book review sites that it goes deeper into the content of the book, and potentially we can allow people to ask LLMs about the book directly via a chat interface (need to prevent abuse).
+Instead of relying on friends’ recommendation or book review sites like blinkist, rely on LLMs such as Google Gemini and ChatGPT to generate generate the following info about the book:
+1. textual summary: includes a summary of the book, and a list of key takeaways
+2. audio summary: using NotebookLM, generate a podcast of the book summary
+3. visual summary: generate a few images summarizing the key takeaways of the book
+
+This differentiates from book review sites that it goes deeper into the content of the book, and potentially we can allow people to ask LLMs about the book directly via a chat interface (need to prevent abuse).
 
 Instead of relying on a chatbot based interface that has higher latency in response and needs to constantly change prompt, build a website with all the prompts ready as well as the results cached so users can experience a seamless experience in learning about a book that they are considering reading.
 
-To monetize the service, rely on Amazon affiliate program to monetize this for users who do consider buying the book at the end. 
+To monetize the service, rely on affiliate programs to monetize this for users who do consider buying the book at the end. 
 
 ---
 
@@ -65,13 +70,14 @@ Also everyone is using Amazon affiliate links to both monetize, and also to pres
 
 3. The typeahead dropdown should cotain two types of results:
   1. Matching book result based on typed prefix. The results should include cover photo, book title, and author. Clicking on this result should take the user to the book detail page. Show up to 5 matching book results sorted by best match.
-  2. Verbatim typed query is always present and displayed at the bottom of the typeahead dropdown (if there are matching book results on top). If the user hits enter or clicks on a verbatim query, it issues a Open Library search for the typed query and is displayed in the Search Result Page.
+  2. Verbatim typed query is always present in the search bar.If the user hits enter while highlight is in the search bar, it issues a Open Library search for the typed query and is displayed in the Search Result Page.
 
 ## Search result page (SERP)
 1. SERP is powered by Open Library book search API. It returns a list of books matching the query, displaying the following information: 
   1. Book title
-  2. Book author
-  3. Book cover image
+  2. Published year
+  3. Book author
+  4. Book cover image
 Clicking on a result will do the following: 
   1. based on the key field in the Open Library API, it will see if there's an existing record in our book db. 
   2. If there's an existing record, it will redirect to the book detail page, indexed by the Open Library key.
@@ -80,22 +86,19 @@ Clicking on a result will do the following:
 ## Book detail page
 Book detail page is powerd by our DB based on metadata fetched by Open Library API and Gemini/ChatGPT.
 1. book cover image
-2. Book title
-3. AI generated section. This section will fetch from Gemini/ChatGPT for the first time, and will cache the result in our DB for subsequent queries. The first visit will show loading state and will fetch the results in the background, and update the UI once the results are returned and stored in our DB. The section includes:
-  1. Book summary
-  2. List of questions to ask about the book, and answers to these questions.
+2. Book title, and published year in parenthesis. E.g. The Great Gatsby (1925)
+3. AI generated section. This section will fetch from Gemini for the first time, and will cache the result in our DB for subsequent queries. The first visit will show loading state and will fetch the results in the background, and update the UI once the results are returned and stored in our DB. The section includes:
+  1. Book summary and key takeaways.
 4. Affiliate links to buy books on Amazon for monetization
 
 ## Popular books section
-This section shows the popular books visited by users over the past week (rolling window of 7 days). We will log total visits to the book detail page per day, and is able to return a ranked list of books by visit over the past week. This section should include book cover image, title, and author. Clicking on a book will redirect to the book detail page.
+This section shows the popular books visited by users over the past week (rolling window of 7 days). If there were no visits, just show the last added books. We will log total visits to the book detail page per day, and is able to return a ranked list of books by visit over the past week. This section should include book cover image, title, and author. Clicking on a book will redirect to the book detail page.
 
 ## Prompts needed
 
 ### Summarize a book 
 
-> Give me a summary of the book {book_title} by {author}  in json format with the following fields: title, author, year, summary. If you don’t know the book or don’t have enough knowledge about the book just return NULL.
-
-IF you are able to provide summary of a book, also provide me a list of prompts i can ask to learn more about the book and a detailed response to the prompt. 
+> Give me a summary of the book {book_title} by {author}  in json format with the following fields: title, author, year, summary, and key takeaways. If you don’t know the book or don’t have enough knowledge about the book just return NULL.
 
 Format your response in valid JSON format only
 > 
@@ -107,12 +110,8 @@ Format your response in valid JSON format only
   3. open library key
   4. cover image
   5. summary
-  6. questions and answers
-  7. affiliate links
-2. Author:
-  1. name
-  2. open library key
-3. Visits:
+  6. affiliate links
+2. Visits:
   1. book id
   2. date
   3. total visits on the day
@@ -121,9 +120,9 @@ Format your response in valid JSON format only
 1. Typeahead: user type in a prefix with a combination of book title, author, or both. Return a list of books in our DB matching the prefix.
 2. Search: makes a call to Open Library API and returns a list of books matching the query. 
 3. Book detail: returns the book detail from our DB, if it exists. If it doesn't exist, fetch from Open Library API and store in our DB.
-4. Book ai digest: returns the book summary and question-answer pairs from our DB, if it exists. If it doesn't exist, fetch from Gemini by default, and store in our DB. Provide the option to use ChatGPT as well.
-5. Query LLM: takes in a prompt and returns the response from either Gemini, ChatGPT, or both together.
-6. Update book ai digest: takes in a book id and the LLM: Gemini or ChatGPT. Use the selected LLM to replace the book summary and question-answer pairs in our DB.
+4. Book summary: returns the book summary from our DB, if it exists. If it doesn't exist, fetch from Gemini by default, and store in our DB. Provide the option to use ChatGPT as well.
+5. Query LLM: takes in a prompt and returns the response from either Gemini, ChatGPT.
+6. Update book summary: takes in a book id and the LLM: Gemini or ChatGPT. Use the selected LLM to replace the book summary and question-answer pairs in our DB.
 7. Popular books: takes in a window of days (default to 7)and returns a list of up to 10 books ranked by total visits within that windows.
 
 ## Affiliate links

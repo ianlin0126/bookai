@@ -3,12 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from typing import List, Optional, Dict, Any
-from app.db.database import get_db
-from app.services import book_service
-from app.db import schemas, models
-from app.core.exceptions import BookNotFoundError
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from datetime import datetime
+
+from app.db.database import get_db
+from app.db import schemas, models
+from app.services import book_service
+from app.core.exceptions import BookNotFoundError
 import httpx
 
 router = APIRouter()
@@ -49,32 +51,22 @@ async def get_book_by_key(
             author=author,
             cover_image_url=cover_image_url
         )
-        print(f"[DEBUG] Successfully got/created book: {result.title if result else None}")
-        return JSONResponse(content=jsonable_encoder(result))
-    except BookNotFoundError as e:
-        print(f"[DEBUG] BookNotFoundError: {str(e)}")
-        raise HTTPException(status_code=404, detail=str(e))
+        return result
+    except BookNotFoundError:
+        raise HTTPException(status_code=404, detail="Book not found")
     except Exception as e:
-        print(f"[DEBUG] Unexpected error: {str(e)}")
+        print(f"[DEBUG] Error in get_book_by_key: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{book_id}")
-async def get_book(
-    book_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+@router.get("/{book_id}", response_model=schemas.BookResponse)
+async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
     """Get a book by ID."""
     try:
-        query = select(models.Book).join(models.Author, isouter=True).where(models.Book.id == book_id)
-        result = await db.execute(query)
-        book = result.scalar_one_or_none()
-        
-        if not book:
+        book = await book_service.get_book(db, book_id)
+        if book is None:
             raise HTTPException(status_code=404, detail="Book not found")
-        
         return book
     except Exception as e:
-        print(f"[DEBUG] Error getting book: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/open_library/{open_library_key}")
@@ -232,7 +224,7 @@ async def refresh_book_content(
         print(f"Error starting refresh: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/debug/list")
+@router.get("/debug/list", response_model=List[schemas.BookResponse])
 async def list_books(
     db: AsyncSession = Depends(get_db),
     limit: int = 20
@@ -243,15 +235,45 @@ async def list_books(
         result = await db.execute(query)
         books = result.scalars().all()
         
-        return [{
-            "id": book.id,
-            "title": book.title,
-            "author_name": book.author.name if book.author else None,
-            "open_library_key": book.open_library_key,
-            "cover_image_url": book.cover_image_url,
-            "created_at": book.created_at,
-            "publication_year": book.publication_year
-        } for book in books]
+        return [
+            schemas.BookResponse(
+                id=book.id,
+                title=book.title,
+                author_id=book.author_id,
+                author_name=book.author.name if book.author else None,
+                open_library_key=book.open_library_key,
+                cover_image_url=book.cover_image_url,
+                summary=book.summary,
+                questions_and_answers=book.questions_and_answers,
+                affiliate_links=book.affiliate_links,
+                created_at=book.created_at,
+                updated_at=book.updated_at
+            ) 
+            for book in books
+        ]
     except Exception as e:
         print(f"[DEBUG] Error listing books: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/debug/authors", response_model=List[Dict[str, Any]])
+async def list_authors(
+    db: AsyncSession = Depends(get_db),
+    limit: int = 50
+):
+    """List authors for debugging."""
+    try:
+        query = select(models.Author).limit(limit)
+        result = await db.execute(query)
+        authors = result.scalars().all()
+        return [
+            {
+                "id": author.id,
+                "name": author.name,
+                "open_library_key": author.open_library_key,
+                "created_at": author.created_at.isoformat() if author.created_at else None
+            }
+            for author in authors
+        ]
+    except Exception as e:
+        print(f"[DEBUG] Error listing authors: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

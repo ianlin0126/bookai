@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from enum import Enum
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, Optional
-from app.db.database import get_db
-from app.services import llm_service, book_service
-from app.db import schemas
+from enum import Enum
 from pydantic import BaseModel
 import json
 import logging
-import re
+
+from app.db.database import get_db
+from app.db import schemas
+from app.services import book_service, llm_service
+from app.core.utils import clean_json_string
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def clean_json_string(json_str: str) -> str:
 async def query_llm(
     request: BookRequest,
     provider: LLMProvider = Query(LLMProvider.GEMINI, description="LLM provider to use"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get an AI-generated book digest using either Gemini (default) or ChatGPT.
@@ -98,31 +99,13 @@ async def query_llm(
 async def refresh_book_digest(
     book_id: int,
     provider: Optional[str] = "gemini",
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Refresh a book's AI-generated content using the specified LLM provider.
     """
     try:
-        book = await book_service.get_book(db, book_id)
-        prompt = generate_book_digest_prompt(book.title, book.author.name)
-        
-        if provider == LLMProvider.GEMINI:
-            response = await llm_service.query_gemini(prompt)
-        else:  # ChatGPT
-            response = await llm_service.query_chatgpt(prompt)
-            
-        # Clean and parse the response
-        cleaned_response = clean_json_string(response)
-        parsed_response = json.loads(cleaned_response)
-        
-        if not parsed_response:
-            raise HTTPException(
-                status_code=404,
-                detail="LLM could not find information about this book"
-            )
-            
-        book = await book_service.refresh_book_digest(db, book_id, json.dumps(parsed_response))
+        book = await book_service.refresh_book_digest(db, book_id, provider)
         return book
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
