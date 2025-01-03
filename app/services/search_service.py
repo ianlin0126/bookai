@@ -3,7 +3,7 @@ import json
 import time
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, case
 from sqlalchemy import select
 from app.db import models, schemas
 
@@ -21,18 +21,36 @@ async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 1
     if not query or len(query.strip()) == 0:
         return []
         
-    # Clean the query and add wildcard for LIKE
-    clean_query = query.strip().lower() + '%'
+    # Clean the query and prepare patterns
+    clean_query = query.strip().lower()
+    strict_pattern = clean_query + '%'  # For exact prefix match
+    word_pattern = '% ' + clean_query + '%'  # For matching word prefixes
     
     # Query books and join with authors to search across both
+    # Use CASE to prioritize strict prefix matches over word prefix matches
     result = await db.execute(
         select(models.Book, models.Author)
         .join(models.Author)
         .where(
             or_(
-                func.lower(models.Book.title).like(clean_query),
-                func.lower(models.Author.name).like(clean_query)
+                # Title matches
+                func.lower(models.Book.title).like(strict_pattern),
+                func.lower(models.Book.title).like(word_pattern),
+                # Author matches
+                func.lower(models.Author.name).like(strict_pattern),
+                func.lower(models.Author.name).like(word_pattern)
             )
+        )
+        .order_by(
+            # Order by match type (strict prefix first, then word prefix)
+            case(
+                (func.lower(models.Book.title).like(strict_pattern), 1),
+                (func.lower(models.Author.name).like(strict_pattern), 1),
+                (func.lower(models.Book.title).like(word_pattern), 2),
+                (func.lower(models.Author.name).like(word_pattern), 2),
+                else_=3
+            ),
+            models.Book.title
         )
         .limit(limit)
     )
