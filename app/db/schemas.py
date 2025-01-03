@@ -62,6 +62,12 @@ class BookSearchResult(BaseModel):
     class Config:
         from_attributes = True
 
+class TypeaheadSuggestion(BaseModel):
+    """Schema for typeahead suggestions."""
+    title: str
+    author: Optional[str] = None
+    cover_image_url: Optional[str] = None
+
 class VisitBase(BaseModel):
     book_id: int
     visit_date: date
@@ -77,11 +83,6 @@ class Visit(VisitBase):
 
     class Config:
         from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-            date: lambda v: v.isoformat()
-        }
-
         json_encoders = {
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat()

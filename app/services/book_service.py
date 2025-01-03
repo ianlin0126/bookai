@@ -1,67 +1,131 @@
-from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from sqlalchemy.orm import joinedload
-from typing import List, Optional, Tuple, Dict, Any
-from app.db import models, schemas
-from app.core.exceptions import BookNotFoundError
-from app.services import llm_service, search_service
-from app.api.llm import generate_book_digest_prompt
+from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 import json
-import re
 
-def validate_book_metadata(digest: dict, book_title: str, book_author: str, threshold: int = 80) -> Tuple[bool, str]:
-    """
-    Validate that the book metadata in the LLM response matches the database record.
-    Uses fuzzy matching to handle slight variations in text.
-    
-    Args:
-        digest: The parsed LLM response
-        book_title: The title from the database
-        book_author: The author from the database
-        threshold: Minimum fuzzy match score (0-100) to consider a match
-        
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
-    # Extract title and author from LLM response
-    digest_title = digest.get("title", "")
-    digest_author = digest.get("author", "")
-    
-    # Skip validation if LLM response doesn't include title/author
-    if not digest_title and not digest_author:
-        return True, ""
-        
-    # Check title match if present
-    if digest_title:
-        title_ratio = fuzz.ratio(digest_title.lower(), book_title.lower())
-        if title_ratio < threshold:
-            return False, f"Title mismatch: LLM response '{digest_title}' doesn't match book title '{book_title}' (match score: {title_ratio})"
-    
-    # Check author match if present
-    if digest_author and book_author:
-        author_ratio = fuzz.ratio(digest_author.lower(), book_author.lower())
-        if author_ratio < threshold:
-            return False, f"Author mismatch: LLM response '{digest_author}' doesn't match book author '{book_author}' (match score: {author_ratio})"
-    
-    return True, ""
+from app.db import models, schemas
+from app.services import llm_service
+from app.core.utils import clean_json_string, validate_book_metadata, generate_book_digest_prompt
 
 async def get_book(db: AsyncSession, book_id: int) -> models.Book:
     """Get a book by ID."""
     result = await db.execute(
-        select(models.Book).where(models.Book.id == book_id)
+        select(models.Book)
+        .options(selectinload(models.Book.author))
+        .where(models.Book.id == book_id)
     )
     book = result.scalar_one_or_none()
     if not book:
-        raise BookNotFoundError(f"Book with id {book_id} not found")
+        raise ValueError(f"Book with id {book_id} not found")
     return book
+
+async def create_book_with_author(
+    db: AsyncSession,
+    title: str,
+    author_name: str,
+    author_key: str = None,
+    publication_year: int = None,
+    open_library_key: str = None,
+    cover_image_url: str = None
+) -> models.Book:
+    """Create a new book with its author."""
+    # Check for existing author
+    if author_key:
+        # Try to find author by key first
+        result = await db.execute(
+            select(models.Author).where(models.Author.open_library_key == author_key)
+        )
+        author = result.scalar_one_or_none()
+        
+        if not author:
+            # If no author found by key, try finding by name without a key
+            result = await db.execute(
+                select(models.Author).where(
+                    models.Author.name == author_name,
+                    models.Author.open_library_key.is_(None)
+                )
+            )
+            author = result.scalar_one_or_none()
+    else:
+        # If no key provided, only look for authors without a key
+        result = await db.execute(
+            select(models.Author).where(
+                models.Author.name == author_name,
+                models.Author.open_library_key.is_(None)
+            )
+        )
+        author = result.scalar_one_or_none()
+    
+    if not author:
+        author = models.Author(
+            name=author_name,
+            open_library_key=author_key
+        )
+        db.add(author)
+    
+    # Create new book
+    book = models.Book(
+        title=title,
+        author=author,
+        publication_year=publication_year,
+        open_library_key=open_library_key,
+        cover_image_url=cover_image_url
+    )
+    db.add(book)
+    await db.commit()
+    await db.refresh(book)
+    return book
+
+async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "gemini") -> models.Book:
+    """Update a book's AI-generated content using the specified LLM provider."""
+    book = await get_book(db, book_id)
+    
+    # Generate prompt and get LLM response
+    prompt = generate_book_digest_prompt(book.title, book.author.name)
+    
+    try:
+        if provider == "gemini":
+            response = await llm_service.query_gemini(prompt)
+        else:  # ChatGPT
+            response = await llm_service.query_chatgpt(prompt)
+    except Exception as e:
+        print(f"LLM service error: {str(e)}")  # Debug log
+        raise ValueError(f"Error getting response from LLM service: {str(e)}")
+    
+    # Clean and parse the response
+    cleaned_response = clean_json_string(response)
+    try:
+        digest = json.loads(cleaned_response)
+        
+        # Validate book metadata to prevent hallucination
+        is_valid, error_message = validate_book_metadata(
+            digest,
+            book.title,
+            book.author.name
+        )
+        
+        if not is_valid:
+            raise ValueError(f"LLM response validation failed: {error_message}")
+        
+        # Update book with the parsed response
+        book.summary = digest.get("summary")
+        book.questions_and_answers = json.dumps(digest.get("questions_and_answers"))
+        book.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        return book
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}, Response: {cleaned_response}")  # Debug log
+        raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
 
 async def get_book_summary(db: AsyncSession, book_id: int) -> Dict[str, str]:
     """Get a book's summary."""
     try:
         book = await get_book(db, book_id)
         return {"summary": book.summary if book.summary else ""}
-    except BookNotFoundError:
+    except ValueError:
         raise
 
 async def get_book_questions_and_answers(db: AsyncSession, book_id: int) -> Dict[str, Any]:
@@ -76,52 +140,6 @@ async def get_book_questions_and_answers(db: AsyncSession, book_id: int) -> Dict
     elif qa is None:
         qa = []
     return {"questions_and_answers": qa}
-
-async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "gemini") -> models.Book:
-    """Update a book's AI-generated content using the specified LLM provider."""
-    try:
-        book = await get_book(db, book_id)
-        
-        # Generate prompt and get LLM response
-        prompt = generate_book_digest_prompt(book.title, book.author_name if book.author_name else "Unknown")
-        
-        try:
-            if provider == "gemini":
-                response = await llm_service.query_gemini(prompt)
-            else:  # ChatGPT
-                response = await llm_service.query_chatgpt(prompt)
-        except Exception as e:
-            print(f"LLM service error: {str(e)}")  # Debug log
-            raise ValueError(f"Error getting response from LLM service: {str(e)}")
-        
-        # Clean and parse the response
-        cleaned_response = clean_json_string(response)
-        try:
-            digest = json.loads(cleaned_response)
-            
-            # Validate book metadata to prevent hallucination
-            is_valid, error_message = validate_book_metadata(
-                digest,
-                book.title,
-                book.author_name if book.author_name else "Unknown"
-            )
-            
-            if not is_valid:
-                raise ValueError(f"LLM response validation failed: {error_message}")
-            
-            # Update book with the parsed response
-            book.summary = digest.get("summary")
-            book.questions_and_answers = json.dumps(digest.get("questions_and_answers"))
-            book.updated_at = datetime.utcnow()
-            
-            await db.commit()
-            return book
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {str(e)}, Response: {cleaned_response}")  # Debug log
-            raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
-    except Exception as e:
-        print(f"Error in refresh_book_digest: {str(e)}")  # Debug log
-        raise
 
 async def create_book(db: AsyncSession, book: schemas.BookCreate) -> models.Book:
     """Create a new book."""
@@ -208,7 +226,7 @@ async def get_book_by_open_library_key(
         
         if not search_results:
             print(f"[DEBUG] No search results found")
-            raise BookNotFoundError(f"Book with Open Library key {open_library_key} not found")
+            raise ValueError(f"Book with Open Library key {open_library_key} not found")
             
         book_data = search_results[0]
         print(f"[DEBUG] Found book data: {book_data}")
@@ -227,49 +245,6 @@ async def get_book_by_open_library_key(
         except Exception as e:
             print(f"[DEBUG] Error creating book: {str(e)}")
             raise
-
-async def create_book_with_author(
-    db: AsyncSession,
-    title: str,
-    author_name: str,
-    open_library_key: str,
-    cover_image_url: Optional[str] = None,
-    publication_year: Optional[int] = None
-) -> models.Book:
-    """Helper function to create a book with its author."""
-    print(f"[DEBUG] Creating book with author: {title} by {author_name}")
-    
-    if not title or not author_name:
-        raise ValueError("Title and author are required")
-    
-    # Create author if not exists
-    result = await db.execute(
-        select(models.Author).where(models.Author.name == author_name)
-    )
-    author = result.scalar_one_or_none()
-    
-    if not author:
-        print(f"[DEBUG] Creating new author: {author_name}")
-        author = models.Author(name=author_name)
-        db.add(author)
-        await db.commit()
-        await db.refresh(author)
-        print(f"[DEBUG] Author created: {author_name}")
-    
-    # Create book
-    print(f"[DEBUG] Creating new book: {title}")
-    book = models.Book(
-        title=title,
-        author_id=author.id,
-        open_library_key=open_library_key,
-        cover_image_url=cover_image_url,
-        publication_year=publication_year
-    )
-    db.add(book)
-    await db.commit()
-    await db.refresh(book)
-    print(f"[DEBUG] Book created: {title}")
-    return book
 
 def clean_json_string(json_str: str) -> str:
     """Clean a string to ensure it's valid JSON."""

@@ -42,15 +42,29 @@ async def process_book(db, title: str) -> Optional[Dict[str, Any]]:
             author_key = book_data.get("author_key")
             
             # Find or create author
-            result = await db.execute(
-                select(Author).where(
-                    or_(
-                        Author.open_library_key == author_key,
-                        Author.name == author_name
+            query = select(Author)
+            if author_key:
+                # If we have an author key, use that as the primary lookup
+                query = query.where(Author.open_library_key == author_key)
+                result = await db.execute(query)
+                author = result.scalar_one_or_none()
+                
+                if not author:
+                    # Try finding exact name match if key lookup failed
+                    query = select(Author).where(
+                        Author.name == author_name,
+                        Author.open_library_key.is_(None)  # Only match authors without a key
                     )
+                    result = await db.execute(query)
+                    author = result.scalar_one_or_none()
+            else:
+                # If no author key, only look up by exact name match for authors without keys
+                query = select(Author).where(
+                    Author.name == author_name,
+                    Author.open_library_key.is_(None)
                 )
-            )
-            author = result.scalar_one_or_none()
+                result = await db.execute(query)
+                author = result.scalar_one_or_none()
             
             if not author:
                 print(f"[DEBUG] Creating new author: {author_name}")

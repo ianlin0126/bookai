@@ -1,20 +1,53 @@
 import httpx
 import json
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db import models
+from sqlalchemy import or_, func
+from sqlalchemy import select
+from app.db import models, schemas
 
-async def get_typeahead_suggestions(db: AsyncSession, query: str) -> List[str]:
-    """Get typeahead suggestions for search."""
-    # For now, just return a simple list of suggestions
-    suggestions = [
-        query + " book",
-        query + " novel",
-        query + " series",
-        query + " author",
-        query + " collection"
-    ]
+async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 10) -> List[schemas.TypeaheadSuggestion]:
+    """Get typeahead suggestions for search by matching book titles and author names.
+    
+    Args:
+        db: Database session
+        query: Search query string
+        limit: Maximum number of suggestions to return
+        
+    Returns:
+        List of TypeaheadSuggestion objects containing book title and author name
+    """
+    if not query or len(query.strip()) == 0:
+        return []
+        
+    # Clean the query and add wildcard for LIKE
+    clean_query = query.strip().lower() + '%'
+    
+    # Query books and join with authors to search across both
+    result = await db.execute(
+        select(models.Book, models.Author)
+        .join(models.Author)
+        .where(
+            or_(
+                func.lower(models.Book.title).like(clean_query),
+                func.lower(models.Author.name).like(clean_query)
+            )
+        )
+        .limit(limit)
+    )
+    
+    matches = result.all()
+    suggestions = []
+    
+    # Format results
+    for book, author in matches:
+        suggestions.append(schemas.TypeaheadSuggestion(
+            title=book.title,
+            author=author.name if author else None,
+            cover_image_url=book.cover_image_url
+        ))
+    
     return suggestions
 
 async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: int = 10) -> List[Dict[str, Any]]:

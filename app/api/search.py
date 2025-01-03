@@ -1,19 +1,21 @@
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from app.db.database import get_db
-from app.services import search_service
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-router = APIRouter()
-templates = Jinja2Templates(directory="templates")
+from app.db.database import get_db
+from app.db import schemas
+from app.services import search_service
 
-@router.get("/typeahead")
+router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
+
+@router.get("/typeahead", response_model=List[schemas.TypeaheadSuggestion])
 async def typeahead(
     q: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_db)
-) -> List[str]:
+):
     """Get typeahead suggestions for search."""
     return await search_service.get_typeahead_suggestions(db, q)
 
