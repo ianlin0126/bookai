@@ -87,53 +87,58 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
         print("[DEBUG] Search parameters:", params)
         print("[DEBUG] Making request to: https://openlibrary.org/search.json")
         
-        async with httpx.AsyncClient() as client:
+        client = httpx.AsyncClient()
+        try:
             start_time = time.time()
             response = await client.get(
                 'https://openlibrary.org/search.json',
                 params=params,
-                timeout=10.0  # 10 second timeout
+                timeout=60.0
             )
             
             if response.status_code != 200:
                 print(f"[DEBUG] Request error searching Open Library: {response.text}")
                 print("[DEBUG] Response status:", response.status_code)
                 return []
-            
-            data = response.json()
-            process_time = time.time() - start_time
-            print(f"[DEBUG] Process time: {process_time:.2f}s")
-            
-            # Transform the results
-            results = []
-            for doc in data.get('docs', []):
-                # Get author info
-                author_names = doc.get('author_name', [])
-                author_keys = doc.get('author_key', [])
-                author = {
-                    'name': author_names[0] if author_names else "Unknown Author",
-                    'key': author_keys[0] if author_keys else None
-                }
                 
-                book = {
-                    'open_library_key': doc.get('key', '').split('/')[-1],
-                    'title': doc.get('title', 'Unknown Title'),
-                    'author': author['name'],
-                    'author_key': author['key'],
-                    'publication_year': doc.get('first_publish_year'),
-                    'cover_image_url': f"https://covers.openlibrary.org/b/id/{doc.get('cover_i')}-M.jpg" if doc.get('cover_i') else None
+            data = response.json()
+            end_time = time.time()
+            print(f"[DEBUG] Open Library API response time: {end_time - start_time:.2f} seconds")
+            
+            if not data.get('docs'):
+                print("[DEBUG] No results found")
+                return []
+            
+            # Process results
+            results = []
+            for doc in data['docs']:
+                # Skip if missing required fields
+                if not doc.get('key') or not doc.get('title'):
+                    continue
+                    
+                # Get first author if available
+                author_name = doc.get('author_name', ['Unknown'])[0] if doc.get('author_name') else 'Unknown'
+                author_key = doc.get('author_key', [None])[0] if doc.get('author_key') else None
+                
+                # Get cover image URL if available
+                cover_id = doc.get('cover_i')
+                cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+                
+                result = {
+                    'title': doc['title'],
+                    'author': author_name,
+                    'author_key': author_key,
+                    'open_library_key': doc['key'].replace('/works/', ''),
+                    'cover_image_url': cover_url,
+                    'publication_year': doc.get('first_publish_year')
                 }
-                print(f"[DEBUG] Transformed book: {book}")
-                results.append(book)
+                results.append(result)
             
             return results
             
-    except httpx.RequestError as e:
-        print(f"[DEBUG] HTTP Request error: {str(e)}")
-        return []
-    except json.JSONDecodeError as e:
-        print(f"[DEBUG] JSON Decode error: {str(e)}")
-        return []
+        finally:
+            await client.aclose()
+            
     except Exception as e:
-        print(f"[DEBUG] Unexpected error: {str(e)}")
+        print(f"[DEBUG] Error searching Open Library: {str(e)}")
         return []

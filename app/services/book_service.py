@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import json
 
@@ -31,39 +31,26 @@ async def create_book_with_author(
     cover_image_url: str = None
 ) -> models.Book:
     """Create a new book with its author."""
-    # Check for existing author
-    if author_key:
-        # Try to find author by key first
-        result = await db.execute(
-            select(models.Author).where(models.Author.open_library_key == author_key)
-        )
-        author = result.scalar_one_or_none()
-        
-        if not author:
-            # If no author found by key, try finding by name without a key
-            result = await db.execute(
-                select(models.Author).where(
-                    models.Author.name == author_name,
-                    models.Author.open_library_key.is_(None)
-                )
-            )
-            author = result.scalar_one_or_none()
-    else:
-        # If no key provided, only look for authors without a key
-        result = await db.execute(
-            select(models.Author).where(
-                models.Author.name == author_name,
-                models.Author.open_library_key.is_(None)
-            )
-        )
-        author = result.scalar_one_or_none()
+    # Only proceed if we have an author key
+    if not author_key:
+        raise ValueError("Cannot create author without OpenLibrary key")
+
+    # Try to find existing author by key
+    result = await db.execute(
+        select(models.Author).where(models.Author.open_library_key == author_key)
+    )
+    author = result.scalar_one_or_none()
     
+    # If author doesn't exist, create new one with the key
     if not author:
         author = models.Author(
             name=author_name,
-            open_library_key=author_key
+            open_library_key=author_key,
+            created_at=datetime.now()  # Explicitly set created_at
         )
         db.add(author)
+        await db.commit()  # Commit to ensure author is created
+        await db.refresh(author)  # Refresh to get all fields
     
     # Create new book
     book = models.Book(
@@ -76,6 +63,7 @@ async def create_book_with_author(
     db.add(book)
     await db.commit()
     await db.refresh(book)
+    
     return book
 
 async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "gemini") -> models.Book:
@@ -158,7 +146,8 @@ async def update_book(db: AsyncSession, book_id: int, book_update: schemas.BookC
     await db.refresh(db_book)
     return db_book
 
-async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[models.Book]:
+async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[schemas.BookResponse]:
+    """Get books with most visits."""
     # Get books with most visits in the last 30 days
     today = datetime.today()
     result = await db.execute(
@@ -178,14 +167,31 @@ async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[models.Bo
         select(models.Book)
         .join(models.Author)
         .where(models.Book.id.in_(book_ids))
+        .options(selectinload(models.Book.author))
     )
-    books = result.all()
+    books = result.scalars().all()
     
     # Sort books by visit count
     visit_counts = {v.book_id: v.total_visits for v in visits}
     books.sort(key=lambda b: visit_counts.get(b.id, 0), reverse=True)
     
-    return books
+    # Convert to Pydantic models
+    return [
+        schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author_name=book.author.name if book.author else None,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
+        for book in books
+    ]
 
 async def get_book_by_open_library_key(
     db: AsyncSession,
