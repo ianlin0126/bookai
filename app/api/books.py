@@ -115,8 +115,30 @@ async def create_book_from_open_library(
     open_library_key: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a book from Open Library data and save it to our database."""
+    """Create a new book from Open Library data. If book already exists in DB, return it."""
     try:
+        # First check if book exists in our DB
+        try:
+            existing_book = await book_service.get_book_by_open_library_key(db, open_library_key)
+            if existing_book:
+                return schemas.BookResponse(
+                    id=existing_book.id,
+                    title=existing_book.title,
+                    author_id=existing_book.author_id,
+                    author=existing_book.author_str,
+                    open_library_key=existing_book.open_library_key,
+                    cover_image_url=existing_book.cover_image_url,
+                    summary=existing_book.summary,
+                    questions_and_answers=existing_book.questions_and_answers,
+                    affiliate_links=existing_book.affiliate_links,
+                    created_at=existing_book.created_at,
+                    updated_at=existing_book.updated_at
+                )
+        except ValueError:
+            # Book not found in DB, continue with creation
+            pass
+            
+        # Create new book from Open Library
         book = await book_service.post_book_by_open_library_key(db, open_library_key)
         return schemas.BookResponse(
             id=book.id,
@@ -174,7 +196,7 @@ async def get_book_summary(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    return {"summary": book.summary or "No summary available yet."}
+    return {"summary": book.summary}
 
 @router.get("/{book_id}/questions_and_answers")
 async def get_book_questions_and_answers(book_id: int, db: AsyncSession = Depends(get_db)):
@@ -187,7 +209,7 @@ async def get_book_questions_and_answers(book_id: int, db: AsyncSession = Depend
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
         
-        return {"questions_and_answers": book.questions_and_answers or []}
+        return {"questions_and_answers": book.questions_and_answers}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

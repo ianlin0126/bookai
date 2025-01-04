@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload, Session
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from app.db import models, schemas
 from app.core.exceptions import BookNotFoundError
@@ -41,8 +41,8 @@ async def record_visit(db: Session, book_id: int) -> models.Visit:
     await db.commit()
     return visit
 
-async def get_popular_books(db: AsyncSession, days: int = 7, limit: int = 10) -> List[models.Book]:
-    """Get the most visited books in the last N days."""
+async def get_popular_books(db: AsyncSession, days: int = 7, limit: int = 10) -> List[Tuple[models.Book, int]]:
+    """Get the most visited books in the last N days with their visit counts."""
     cutoff_date = datetime.now().date() - timedelta(days=days)
     
     # Build subquery to get visit counts
@@ -58,7 +58,7 @@ async def get_popular_books(db: AsyncSession, days: int = 7, limit: int = 10) ->
     
     # Main query joining books with visit counts and authors
     query = (
-        select(models.Book)
+        select(models.Book, visit_counts.c.total_visits)
         .join(visit_counts, models.Book.id == visit_counts.c.book_id)
         .join(models.Author)
         .options(selectinload(models.Book.author))
@@ -67,4 +67,4 @@ async def get_popular_books(db: AsyncSession, days: int = 7, limit: int = 10) ->
     )
     
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.all()

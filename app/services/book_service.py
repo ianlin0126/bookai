@@ -233,7 +233,7 @@ async def post_book_by_open_library_key(
     """
     if title and author:
         print(f"[DEBUG] Creating new book with provided title/author: {title} by {author}")
-        return await create_book_with_author(db, title, author, open_library_key, cover_image_url)
+        return await create_book_with_author(db, title, author, open_library_key=open_library_key, cover_image_url=cover_image_url)
     
     print(f"[DEBUG] Fetching from Open Library API for key: {open_library_key}")
     # Fetch from Open Library Works API
@@ -251,6 +251,7 @@ async def post_book_by_open_library_key(
         
         # Get author information
         author_name = "Unknown"
+        author_key = None
         if data.get('authors'):
             author_data = data['authors'][0].get('author', {})
             if isinstance(author_data, dict):
@@ -276,8 +277,9 @@ async def post_book_by_open_library_key(
                 db,
                 data.get('title'),
                 author_name,
-                open_library_key,
-                cover_url
+                author_key=author_key,
+                open_library_key=open_library_key,
+                cover_image_url=cover_url
             )
             print(f"[DEBUG] Successfully created book: {book.title}")
             return book
