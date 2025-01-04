@@ -26,6 +26,8 @@ def generate_book_digest_prompt(title: str, author: str) -> str:
     """Generate a prompt for the LLM to create a book digest."""
     return f"""Please analyze the book '{title}' by {author} and provide a comprehensive digest in the following JSON format:
 {{
+    "title": "{title}",
+    "author": "{author}",
     "summary": "A detailed summary of the book's content, themes, and key takeaways",
     "questions_and_answers": [
         {{

@@ -52,19 +52,3 @@ def validate_book_metadata(digest: dict, book_title: str, book_author: str, thre
             return False, f"Author mismatch: LLM response '{digest_author}' doesn't match book author '{book_author}' (match score: {author_ratio})"
     
     return True, ""
-
-def generate_book_digest_prompt(title: str, author: str) -> str:
-    """Generate a prompt for the LLM to create a book digest."""
-    return f"""Please provide information about the book "{title}" by {author} in the following JSON format:
-{{
-    "title": "The exact book title",
-    "author": "The author's name",
-    "summary": "A concise 2-3 paragraph summary of the book's plot, themes, and significance",
-    "questions_and_answers": [
-        {{
-            "question": "An insightful question about the book",
-            "answer": "A detailed answer to the question"
-        }},
-        // 2-3 more question/answer pairs
-    ]
-}}"""

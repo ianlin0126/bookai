@@ -213,21 +213,6 @@ async def get_book_questions_and_answers(book_id: int, db: AsyncSession = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{book_id}/refresh")
-async def refresh_book_content(
-    book_id: int,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
-):
-    """Refresh a book's AI-generated content."""
-    try:
-        # Start the refresh in the background
-        background_tasks.add_task(book_service.refresh_book_digest, db, book_id)
-        return JSONResponse(content={"status": "refresh_started"})
-    except Exception as e:
-        print(f"Error starting refresh: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/debug/list", response_model=List[schemas.BookResponse])
 async def list_books(
     db: AsyncSession = Depends(get_db),

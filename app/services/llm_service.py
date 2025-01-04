@@ -10,6 +10,14 @@ load_dotenv()
 # Configure OpenAI
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Configure Gemini
+api_key = os.getenv("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    gemini_model = genai.GenerativeModel('gemini-pro')
+else:
+    gemini_model = None
+
 def format_system_prompt() -> str:
     return """You are a book analysis assistant. Always respond in valid JSON format.
 Your responses must be structured exactly as shown in the user's prompt.
@@ -18,12 +26,8 @@ If you cannot provide information about a book, return null."""
 
 async def query_gemini(prompt: str) -> str:
     """Query Google's Gemini model with enforced JSON response."""
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
+    if not gemini_model:
         raise ValueError("GOOGLE_API_KEY environment variable is not set")
-    
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
     
     # Add JSON formatting instruction
     formatted_prompt = f"""IMPORTANT: Respond ONLY with a JSON object.
@@ -33,7 +37,7 @@ If you cannot provide information about the book, return null.
 {prompt}"""
     
     try:
-        response = await model.generate_content_async(formatted_prompt)
+        response = await gemini_model.generate_content_async(formatted_prompt)
         if not response or not response.text:
             raise ValueError("Empty response from Gemini API")
         return response.text

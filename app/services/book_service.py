@@ -8,7 +8,8 @@ import httpx
 
 from app.db import models, schemas
 from app.services import llm_service
-from app.core.utils import clean_json_string, validate_book_metadata, generate_book_digest_prompt
+from app.core.utils import clean_json_string, validate_book_metadata
+from app.api.llm import generate_book_digest_prompt
 
 async def get_book(db: AsyncSession, book_id: int) -> models.Book:
     """Get a book by ID."""
@@ -74,20 +75,25 @@ async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "g
     
     # Generate prompt and get LLM response
     prompt = generate_book_digest_prompt(book.title, book.author.name)
+    print(f"Generated prompt: {prompt}")  # Debug log
     
     try:
         if provider == "gemini":
             response = await llm_service.query_gemini(prompt)
         else:  # ChatGPT
             response = await llm_service.query_chatgpt(prompt)
+        print(f"Raw LLM response: {response}")  # Debug log
     except Exception as e:
         print(f"LLM service error: {str(e)}")  # Debug log
         raise ValueError(f"Error getting response from LLM service: {str(e)}")
     
     # Clean and parse the response
     cleaned_response = clean_json_string(response)
+    print(f"Cleaned response: {cleaned_response}")  # Debug log
+    
     try:
         digest = json.loads(cleaned_response)
+        print(f"Parsed digest: {json.dumps(digest, indent=2)}")  # Debug log
         
         # Validate book metadata to prevent hallucination
         is_valid, error_message = validate_book_metadata(
@@ -95,16 +101,26 @@ async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "g
             book.title,
             book.author.name
         )
+        print(f"Validation result: valid={is_valid}, message={error_message}")  # Debug log
         
         if not is_valid:
             raise ValueError(f"LLM response validation failed: {error_message}")
+        
+        # Refresh the book object
+        await db.refresh(book)
         
         # Update book with the parsed response
         book.summary = digest.get("summary")
         book.questions_and_answers = json.dumps(digest.get("questions_and_answers"))
         book.updated_at = datetime.utcnow()
         
+        # Explicitly add the book to the session
+        db.add(book)
+        await db.flush()
         await db.commit()
+        
+        # Refresh one final time to ensure we have the latest data
+        await db.refresh(book)
         return book
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {str(e)}, Response: {cleaned_response}")  # Debug log
@@ -233,7 +249,7 @@ async def post_book_by_open_library_key(
     """
     if title and author:
         print(f"[DEBUG] Creating new book with provided title/author: {title} by {author}")
-        return await create_book_with_author(db, title, author, open_library_key=open_library_key, cover_image_url=cover_image_url)
+        return await create_book_with_author(db, title, author, open_library_key, cover_image_url)
     
     print(f"[DEBUG] Fetching from Open Library API for key: {open_library_key}")
     # Fetch from Open Library Works API
