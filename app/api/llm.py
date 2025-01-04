@@ -92,12 +92,24 @@ async def refresh_book_digest(
     """
     try:
         book = await book_service.refresh_book_digest(db, book_id, provider)
-        return book
+        return schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author=book.author_str,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
         if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail="Book not found")
         raise HTTPException(status_code=500, detail=str(e))
