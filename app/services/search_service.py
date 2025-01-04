@@ -1,6 +1,7 @@
 import httpx
 import json
 import time
+import re
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_, func, case
@@ -63,10 +64,16 @@ async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 1
         suggestions.append(schemas.TypeaheadSuggestion(
             title=book.title,
             author=author.name if author else None,
-            cover_image_url=book.cover_image_url
+            cover_image_url=convert_to_small_cover(book.cover_image_url)
         ))
     
     return suggestions
+
+def convert_to_small_cover(url: Optional[str]) -> Optional[str]:
+    """Convert an OpenLibrary cover URL to use the small (-S) size."""
+    if not url:
+        return None
+    return re.sub(r'-[LM]\.jpg$', '-S.jpg', url)
 
 async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: int = 10) -> List[Dict[str, Any]]:
     """Search for books using Open Library API."""

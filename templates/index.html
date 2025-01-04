@@ -37,7 +37,7 @@
         <!-- Popular Books Section -->
         <div class="mb-8">
             <h2 class="text-2xl font-semibold text-gray-900 mb-4">Popular Books</h2>
-            <div id="popular-books" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div id="popular-books" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
                 <!-- Popular books will be loaded here -->
             </div>
         </div>
@@ -48,19 +48,66 @@
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <!-- Header -->
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
                     <div class="flex justify-between items-start">
-                        <h3 id="modal-title" class="text-2xl font-semibold text-gray-900"></h3>
-                        <button type="button" onclick="closeModal()" class="bg-white rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
-                            <span class="sr-only">Close</span>
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        <div>
+                            <h3 id="modal-title" class="text-2xl font-semibold text-gray-900"></h3>
+                            <p id="modal-author" class="mt-1 text-gray-600"></p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <button id="refresh-button" 
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Refresh Summary
+                            </button>
+                            <button type="button" onclick="closeModal()" class="bg-white rounded-md p-2 inline-flex items-center justify-center text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                                <span class="sr-only">Close</span>
+                                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div id="modal-content" class="mt-4">
-                        <!-- Book details will be loaded here -->
+                    
+                    <!-- Content -->
+                    <div id="modal-content" class="mt-6 grid grid-cols-12 gap-6">
+                        <!-- Book Cover -->
+                        <div class="col-span-4">
+                            <div id="book-cover" class="aspect-w-2 bg-gray-100 rounded-lg overflow-hidden">
+                                <!-- Cover image will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Book Details -->
+                        <div class="col-span-8 space-y-6">
+                            <!-- Summary Section -->
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 mb-2">Summary</h4>
+                                <div id="book-summary" class="prose prose-indigo max-w-none">
+                                    <!-- Summary will be loaded here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Questions & Answers Section -->
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 mb-2">Questions & Answers</h4>
+                                <div id="book-qa" class="space-y-4">
+                                    <!-- Q&A will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="loading-state" class="hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+                        <div class="flex flex-col items-center">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                            <p class="mt-2 text-sm text-gray-600">Loading...</p>
+                        </div>
                     </div>
                 </div>
             </div>

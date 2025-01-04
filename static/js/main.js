@@ -2,9 +2,17 @@
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 const popularBooks = document.getElementById('popular-books');
-const bookModal = document.getElementById('bookModal');
-const modalTitle = document.getElementById('modalTitle');
-const modalContent = document.getElementById('modalContent');
+const bookModal = document.getElementById('book-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalAuthor = document.getElementById('modal-author');
+const modalContent = document.getElementById('modal-content');
+const bookCover = document.getElementById('book-cover');
+const bookSummary = document.getElementById('book-summary');
+const bookQA = document.getElementById('book-qa');
+const loadingState = document.getElementById('loading-state');
+const refreshButton = document.getElementById('refresh-button');
+
+let currentBookId = null;
 
 // Debounce function
 function debounce(func, wait) {
@@ -17,6 +25,12 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// Helper functions
+function getMediumCoverUrl(url) {
+    if (!url) return null;
+    return url.replace(/-[LS]\.jpg$/, '-M.jpg');
 }
 
 // Search functionality
@@ -171,15 +185,20 @@ async function loadPopularBooks() {
         const books = await response.json();
         
         popularBooks.innerHTML = books.map(book => `
-            <div class="book-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200" 
+            <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200" 
                  onclick="handleBookClick(${book.id})">
-                ${book.cover_image_url ? 
-                    `<img src="${book.cover_image_url}" alt="${book.title}" class="w-full h-48 object-cover">` :
-                    '<div class="w-full h-48 bg-gray-200"></div>'
-                }
-                <div class="p-4">
-                    <h3 class="font-medium text-gray-900">${book.title}</h3>
-                    ${book.author ? `<p class="text-sm text-gray-600">${book.author}</p>` : ''}
+                <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
+                    ${book.cover_image_url ? 
+                        `<img src="${getMediumCoverUrl(book.cover_image_url)}" 
+                             alt="${book.title}" 
+                             class="h-full w-auto object-contain"
+                             style="min-height: 100%;">` :
+                        '<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">No cover</div>'
+                    }
+                </div>
+                <div class="p-2">
+                    <h3 class="font-medium text-gray-900 text-sm line-clamp-1">${book.title}</h3>
+                    ${book.author ? `<p class="text-xs text-gray-600 line-clamp-1">${book.author}</p>` : ''}
                 </div>
             </div>
         `).join('');
@@ -194,7 +213,7 @@ async function handleBookClick(bookId) {
         searchResults.classList.add('hidden');
         
         // First check if book exists in our database
-        const response = await fetch(`/books/open_library/${bookId}`);
+        const response = await fetch(`/books/${bookId}`);
         
         let ourBookId;
         if (response.ok) {
@@ -229,62 +248,51 @@ async function handleBookClick(bookId) {
 // Show book details
 async function showBookDetails(bookId) {
     try {
+        currentBookId = bookId;
         console.log('Fetching book details for ID:', bookId);
         
-        // Fetch data
-        const [bookResponse, summaryResponse, qaResponse] = await Promise.all([
-            fetch(`/books/${bookId}`),
-            fetch(`/books/${bookId}/summary`),
-            fetch(`/books/${bookId}/qa`)
-        ]);
-
-        // Check responses
-        for (const response of [bookResponse, summaryResponse, qaResponse]) {
-            if (!response.ok) {
-                console.error('Response not OK:', await response.text());
-                throw new Error(`API request failed with status ${response.status}`);
-            }
-        }
-
-        // Parse JSON responses
-        let book, summaryData, qaData;
-        try {
-            [book, summaryData, qaData] = await Promise.all([
-                bookResponse.json(),
-                summaryResponse.json(),
-                qaResponse.json()
-            ]);
-        } catch (e) {
-            console.error('JSON parsing error:', e);
-            throw e;
-        }
-
-        console.log('Parsed book data:', book);
-        console.log('Parsed summary data:', summaryData);
-        console.log('Parsed QA data:', qaData);
-
-        // Update modal content
-        const modalTitle = document.querySelector('#bookModal .modal-title');
-        const modalContent = document.querySelector('#bookModal .modal-content');
+        // Show loading state
+        loadingState.classList.remove('hidden');
         
-        if (modalTitle && modalContent) {
-            modalTitle.textContent = book.title;
-            
-            modalContent.innerHTML = `
-                <div class="book-details">
-                    <div class="book-cover">
-                        ${book.cover_image_url ? 
-                            `<img src="${book.cover_image_url}" alt="${book.title} cover" class="book-cover-img">` :
-                            '<div class="no-cover">No cover available</div>'
-                        }
+        // Fetch book data
+        const response = await fetch(`/books/${bookId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch book details: ${response.status}`);
+        }
+        
+        const book = await response.json();
+        console.log('Book data:', book);
+        
+        // Update modal content
+        modalTitle.textContent = book.title;
+        modalAuthor.textContent = `by ${book.author || 'Unknown Author'}`;
+        
+        // Update book cover
+        bookCover.innerHTML = book.cover_image_url 
+            ? `<img src="${book.cover_image_url}" alt="${book.title} cover" class="w-full h-full object-cover">` 
+            : '<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">No cover available</div>';
+        
+        // Update summary
+        bookSummary.innerHTML = book.summary 
+            ? `<p>${book.summary}</p>`
+            : '<p class="text-gray-500">No summary available. Click refresh to generate one.</p>';
+        
+        // Update Q&A
+        if (book.questions_and_answers) {
+            try {
+                const qa = JSON.parse(book.questions_and_answers);
+                bookQA.innerHTML = qa.map((item, index) => `
+                    <div class="qa-item bg-gray-50 p-4 rounded-lg">
+                        <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${item.question}</h5>
+                        <p class="text-gray-600">${item.answer}</p>
                     </div>
-                    <div class="book-info">
-                        <h3>${book.title}</h3>
-                        <p class="author">by ${book.author || 'Unknown Author'}</p>
-                        ${book.publication_year ? `<p class="year">Published: ${book.publication_year}</p>` : ''}
-                    </div>
-                </div>
-            `;
+                `).join('');
+            } catch (e) {
+                console.error('Error parsing Q&A:', e);
+                bookQA.innerHTML = '<p class="text-gray-500">Error loading questions and answers.</p>';
+            }
+        } else {
+            bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available. Click refresh to generate them.</p>';
         }
         
         // Show modal
@@ -292,13 +300,80 @@ async function showBookDetails(bookId) {
         
     } catch (error) {
         console.error('Error showing book details:', error);
+        // Show error in modal
+        modalContent.innerHTML = `
+            <div class="text-red-600 p-4">
+                Error loading book details: ${error.message}
+            </div>
+        `;
+    } finally {
+        loadingState.classList.add('hidden');
+    }
+}
+
+// Refresh book digest
+async function refreshBookDigest() {
+    if (!currentBookId) return;
+    
+    try {
+        // Show loading state
+        loadingState.classList.remove('hidden');
+        refreshButton.disabled = true;
+        refreshButton.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        // Call refresh endpoint
+        const response = await fetch(`/api/llm/books/${currentBookId}/refresh?provider=gemini`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to refresh book digest: ${response.status}`);
+        }
+        
+        const book = await response.json();
+        console.log('Refreshed book data:', book);
+        
+        // Update summary and Q&A sections
+        bookSummary.innerHTML = book.summary 
+            ? `<p>${book.summary}</p>`
+            : '<p class="text-gray-500">No summary available.</p>';
+        
+        if (book.questions_and_answers) {
+            try {
+                const qa = JSON.parse(book.questions_and_answers);
+                bookQA.innerHTML = qa.map((item, index) => `
+                    <div class="qa-item bg-gray-50 p-4 rounded-lg">
+                        <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${item.question}</h5>
+                        <p class="text-gray-600">${item.answer}</p>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Error parsing Q&A:', e);
+                bookQA.innerHTML = '<p class="text-gray-500">Error loading questions and answers.</p>';
+            }
+        } else {
+            bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available.</p>';
+        }
+        
+    } catch (error) {
+        console.error('Error refreshing book digest:', error);
+        // Show error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'fixed bottom-4 right-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4';
+        errorDiv.textContent = `Error refreshing book digest: ${error.message}`;
+        document.body.appendChild(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);
+    } finally {
+        loadingState.classList.add('hidden');
+        refreshButton.disabled = false;
+        refreshButton.classList.remove('opacity-50', 'cursor-not-allowed');
     }
 }
 
 // Close modal
 function closeModal() {
     bookModal.classList.add('hidden');
-    document.body.style.overflow = ''; // Restore scrolling
+    currentBookId = null;
 }
 
 // Event listeners
@@ -324,3 +399,8 @@ document.addEventListener('keydown', (e) => {
 
 // Load popular books on page load
 loadPopularBooks();
+
+// Event listeners
+if (refreshButton) {
+    refreshButton.addEventListener('click', refreshBookDigest);
+}
