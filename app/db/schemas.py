@@ -48,6 +48,10 @@ class BookResponse(Book):
     """Response model for book endpoints that includes all fields."""
     pass
 
+class BookQAResponse(BaseModel):
+    """Response model for book Q&A."""
+    questions_and_answers: Union[List[Dict[str, str]], str, None] = Field(default=None, description="List of Q&A pairs or raw Q&A text")
+
 class BookSearchResult(BaseModel):
     title: str
     author: Optional[str] = None
@@ -60,6 +64,7 @@ class BookSearchResult(BaseModel):
 
 class TypeaheadSuggestion(BaseModel):
     """Schema for typeahead suggestions."""
+    id: int
     title: str
     author: Optional[str] = None
     cover_image_url: Optional[str] = None

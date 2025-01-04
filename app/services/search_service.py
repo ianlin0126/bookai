@@ -17,7 +17,7 @@ async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 1
         limit: Maximum number of suggestions to return
         
     Returns:
-        List of TypeaheadSuggestion objects containing book title and author name
+        List of TypeaheadSuggestion objects containing book title, author name, and book ID
     """
     if not query or len(query.strip()) == 0:
         return []
@@ -62,6 +62,7 @@ async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 1
     # Format results
     for book, author in matches:
         suggestions.append(schemas.TypeaheadSuggestion(
+            id=book.id,
             title=book.title,
             author=author.name if author else None,
             cover_image_url=convert_to_small_cover(book.cover_image_url)

@@ -275,7 +275,11 @@ async function showBookDetails(bookId) {
         // Update summary
         bookSummary.innerHTML = book.summary 
             ? `<p>${book.summary}</p>`
-            : '<p class="text-gray-500">No summary available. Click refresh to generate one.</p>';
+            : '<p class="text-gray-500">No summary available yet.</p>';
+            
+        // Show/hide refresh button based on summary existence
+        refreshButton.classList.toggle('hidden', !!book.summary);
+        refreshButton.textContent = 'AI Summarize';
         
         // Update Q&A
         if (book.questions_and_answers) {
@@ -292,7 +296,7 @@ async function showBookDetails(bookId) {
                 bookQA.innerHTML = '<p class="text-gray-500">Error loading questions and answers.</p>';
             }
         } else {
-            bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available. Click refresh to generate them.</p>';
+            bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available yet.</p>';
         }
         
         // Show modal
@@ -322,11 +326,21 @@ async function refreshBookDigest() {
         refreshButton.classList.add('opacity-50', 'cursor-not-allowed');
         
         // Call refresh endpoint
-        const response = await fetch(`/api/llm/books/${currentBookId}/refresh?provider=gemini`, {
+        const response = await fetch(`/llm/books/${currentBookId}/refresh`, {
             method: 'POST'
         });
         
         if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Error response:', errorData);
+            
+            // Check if it's a metadata validation error
+            if (response.status === 400 && (errorData.includes('Title mismatch') || errorData.includes('Author mismatch'))) {
+                bookSummary.innerHTML = '<p class="text-gray-500 italic">AI is not able to summarize this book.</p>';
+                bookQA.innerHTML = '<p class="text-gray-500 italic">No questions and answers available.</p>';
+                return;
+            }
+            
             throw new Error(`Failed to refresh book digest: ${response.status}`);
         }
         
