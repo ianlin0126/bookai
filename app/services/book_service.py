@@ -4,6 +4,7 @@ from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import json
+import httpx
 
 from app.db import models, schemas
 from app.services import llm_service
@@ -13,6 +14,7 @@ async def get_book(db: AsyncSession, book_id: int) -> models.Book:
     """Get a book by ID."""
     result = await db.execute(
         select(models.Book)
+        .join(models.Author)
         .options(selectinload(models.Book.author))
         .where(models.Book.id == book_id)
     )
@@ -181,7 +183,7 @@ async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[schemas.B
             id=book.id,
             title=book.title,
             author_id=book.author_id,
-            author_name=book.author.name if book.author else None,
+            author=book.author_str,
             open_library_key=book.open_library_key,
             cover_image_url=book.cover_image_url,
             summary=book.summary,
@@ -196,22 +198,17 @@ async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[schemas.B
 async def get_book_by_open_library_key(
     db: AsyncSession,
     open_library_key: str,
-    title: Optional[str] = None,
-    author: Optional[str] = None,
-    cover_image_url: Optional[str] = None
 ) -> models.Book:
     """
-    Get or create a book by Open Library key.
-    If book doesn't exist and title/author provided, creates new book.
-    If book doesn't exist and no title/author, fetches from Open Library API.
+    Get a book by Open Library key from the database.
     """
     print(f"[DEBUG] get_book_by_open_library_key called with key: {open_library_key}")
-    print(f"[DEBUG] Title: {title}, Author: {author}")
     
     # Try to find existing book
     result = await db.execute(
         select(models.Book)
         .join(models.Author, isouter=True)
+        .options(selectinload(models.Book.author))
         .where(models.Book.open_library_key == open_library_key)
     )
     book = result.scalar_one_or_none()
@@ -219,32 +216,68 @@ async def get_book_by_open_library_key(
     if book:
         print(f"[DEBUG] Found existing book: {book.title}")
         return book
-        
-    # If no existing book, we need to create one
+    else:
+        raise ValueError(f"Book with Open Library key {open_library_key} not found")
+
+async def post_book_by_open_library_key(
+    db: AsyncSession,
+    open_library_key: str,
+    title: Optional[str] = None,
+    author: Optional[str] = None,
+    cover_image_url: Optional[str] = None
+) -> models.Book:
+    """
+    Create a new book from Open Library key.
+    If title/author provided, creates book with those details.
+    Otherwise, fetches details from Open Library API.
+    """
     if title and author:
         print(f"[DEBUG] Creating new book with provided title/author: {title} by {author}")
         return await create_book_with_author(db, title, author, open_library_key, cover_image_url)
-    else:
-        print(f"[DEBUG] Searching Open Library API for key: {open_library_key}")
-        # Search Open Library API
-        search_results = await search_service.search_books(db, open_library_key, 1, 1)
-        print(f"[DEBUG] Search results: {search_results}")
+    
+    print(f"[DEBUG] Fetching from Open Library API for key: {open_library_key}")
+    # Fetch from Open Library Works API
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f'https://openlibrary.org/works/{open_library_key}.json',
+            timeout=60.0
+        )
         
-        if not search_results:
-            print(f"[DEBUG] No search results found")
+        if response.status_code != 200:
+            print(f"[DEBUG] Request error fetching from Open Library: {response.text}")
             raise ValueError(f"Book with Open Library key {open_library_key} not found")
             
-        book_data = search_results[0]
-        print(f"[DEBUG] Found book data: {book_data}")
+        data = response.json()
+        
+        # Get author information
+        author_name = "Unknown"
+        if data.get('authors'):
+            author_data = data['authors'][0].get('author', {})
+            if isinstance(author_data, dict):
+                author_key = author_data.get('key', '').replace('/authors/', '')
+                # Fetch author details
+                author_response = await client.get(
+                    f'https://openlibrary.org/authors/{author_key}.json',
+                    timeout=60.0
+                )
+                if author_response.status_code == 200:
+                    author_info = author_response.json()
+                    author_name = author_info.get('name', 'Unknown')
+        
+        # Get cover image URL
+        cover_id = None
+        if data.get('covers'):
+            cover_id = data['covers'][0]
+        cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
         
         # Create book with data from Open Library
         try:
             book = await create_book_with_author(
                 db,
-                book_data.get("title"),
-                book_data.get("author"),
+                data.get('title'),
+                author_name,
                 open_library_key,
-                book_data.get("cover_image_url")
+                cover_url
             )
             print(f"[DEBUG] Successfully created book: {book.title}")
             return book

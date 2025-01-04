@@ -21,4 +21,21 @@ async def get_popular_books(
     limit: int = Query(10, ge=1, le=50, description="Maximum number of books to return"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await analytics_service.get_popular_books(db, days=days, limit=limit)
+    """Get the most popular books based on visit count."""
+    books = await analytics_service.get_popular_books(db, days=days, limit=limit)
+    return [
+        schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author=book.author_str,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
+        for book in books
+    ]

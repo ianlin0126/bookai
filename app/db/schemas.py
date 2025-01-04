@@ -36,7 +36,7 @@ class Book(BookBase):
     author_id: Optional[int]
     created_at: datetime
     updated_at: Optional[datetime] = None
-    author_name: Optional[str] = None  # Use the property from the model
+    author: Optional[str] = None  # Use the property from the model
 
     class Config:
         from_attributes = True
@@ -47,10 +47,6 @@ class Book(BookBase):
 class BookResponse(Book):
     """Response model for book endpoints that includes all fields."""
     pass
-
-class BookQAResponse(BaseModel):
-    """Response model for book Q&A."""
-    questions_and_answers: Union[List[Dict[str, str]], str, None] = Field(default=None, description="List of Q&A pairs or raw Q&A text")
 
 class BookSearchResult(BaseModel):
     title: str
@@ -87,10 +83,3 @@ class Visit(VisitBase):
             datetime: lambda v: v.isoformat(),
             date: lambda v: v.isoformat()
         }
-
-class OpenLibrarySearchResult(BaseModel):
-    """Schema for OpenLibrary search results."""
-    title: str
-    author_name: Optional[str] = None
-    author_key: Optional[str] = None
-    key: str

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from typing import List, Optional, Dict, Any
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -26,142 +26,139 @@ async def create_book(book: schemas.BookCreate, db: AsyncSession = Depends(get_d
 async def get_popular_books(limit: int = 10, db: AsyncSession = Depends(get_db)):
     return await book_service.get_popular_books(db, limit=limit)
 
-@router.get("/by_key/{open_library_key:path}", response_model=schemas.BookResponse)
-async def get_book_by_key(
-    open_library_key: str,
-    title: Optional[str] = None,
-    author: Optional[str] = None,
-    cover_image_url: Optional[str] = None,
+@router.get("/{book_id}", response_model=schemas.BookResponse)
+async def get_book(
+    book_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get or create a book by Open Library key.
-    If book doesn't exist and title/author provided, creates new book.
-    If book doesn't exist and no title/author, fetches from Open Library API.
-    """
-    # Remove any leading slashes
-    open_library_key = open_library_key.lstrip('/')
-    
-    print(f"[DEBUG] API endpoint called with key: {open_library_key}")
-    try:
-        result = await book_service.get_book_by_open_library_key(
-            db,
-            open_library_key,
-            title=title,
-            author=author,
-            cover_image_url=cover_image_url
-        )
-        return result
-    except BookNotFoundError:
-        raise HTTPException(status_code=404, detail="Book not found")
-    except Exception as e:
-        print(f"[DEBUG] Error in get_book_by_key: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/{book_id}", response_model=schemas.BookResponse)
-async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
-    """Get a book by ID."""
+    """Get a book by its ID."""
     try:
         book = await book_service.get_book(db, book_id)
-        if book is None:
-            raise HTTPException(status_code=404, detail="Book not found")
-        return book
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/open_library/{open_library_key}")
-async def get_book_by_open_library_key(
-    open_library_key: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get a book by its Open Library key."""
-    try:
-        query = select(models.Book).where(models.Book.open_library_key == open_library_key)
-        result = await db.execute(query)
-        book = result.scalar_one_or_none()
         
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
         
-        return book
+        return schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author=book.author_str,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
     except Exception as e:
-        print(f"[DEBUG] Error getting book: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/open_library/{open_library_key}")
+@router.get("/open_library/{open_library_key}")
+async def search_book_by_open_library_key(open_library_key: str):
+    """Search for a book by its Open Library key directly from Open Library API."""
+    try:
+        async with httpx.AsyncClient() as client:
+            # Fetch book data
+            response = await client.get(
+                f'https://openlibrary.org/works/{open_library_key}.json',
+                timeout=60.0
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Book with key {open_library_key} not found on Open Library"
+                )
+                
+            book_data = response.json()
+            
+            # Get author information
+            author_name = "Unknown"
+            if book_data.get('authors'):
+                author_data = book_data['authors'][0].get('author', {})
+                if isinstance(author_data, dict):
+                    author_key = author_data.get('key', '').replace('/authors/', '')
+                    # Fetch author details
+                    author_response = await client.get(
+                        f'https://openlibrary.org/authors/{author_key}.json',
+                        timeout=60.0
+                    )
+                    if author_response.status_code == 200:
+                        author_info = author_response.json()
+                        author_name = author_info.get('name', 'Unknown')
+            
+            # Get cover image URL
+            cover_id = None
+            if book_data.get('covers'):
+                cover_id = book_data['covers'][0]
+            cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+            
+            # Return book data
+            return {
+                "title": book_data.get('title'),
+                "author": author_name,
+                "open_library_key": open_library_key,
+                "cover_image_url": cover_url,
+                "description": book_data.get('description', {}).get('value') if isinstance(book_data.get('description'), dict) else book_data.get('description'),
+                "first_publish_date": book_data.get('first_publish_date')
+            }
+            
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error fetching data from Open Library: {str(e)}"
+        )
+
+@router.post("/open_library/{open_library_key}", response_model=schemas.BookResponse)
 async def create_book_from_open_library(
     open_library_key: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a book from Open Library data."""
+    """Create a book from Open Library data and save it to our database."""
     try:
-        # Check if book already exists
-        query = select(models.Book).where(models.Book.open_library_key == open_library_key)
-        result = await db.execute(query)
-        existing_book = result.scalar_one_or_none()
-        
-        if existing_book:
-            return existing_book
-        
-        # Fetch book data from Open Library
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"https://openlibrary.org/works/{open_library_key}.json")
-            if response.status_code != 200:
-                raise HTTPException(status_code=400, detail="Failed to fetch book data from Open Library")
-            
-            data = response.json()
-            
-            # Get author name and key
-            author_name = "Unknown Author"
-            author_key = None
-            if data.get('authors'):
-                author_data = data['authors'][0].get('author', {})
-                author_key = author_data.get('key', '').split('/')[-1] if author_data.get('key') else None
-                if author_key:
-                    author_response = await client.get(f"https://openlibrary.org{author_data.get('key')}.json")
-                    if author_response.status_code == 200:
-                        author_data = author_response.json()
-                        author_name = author_data.get('name', "Unknown Author")
-            
-            # Get or create author
-            author = None
-            if author_key:
-                # Check if author exists
-                author_query = select(models.Author).where(models.Author.open_library_key == author_key)
-                author_result = await db.execute(author_query)
-                author = author_result.scalar_one_or_none()
-                
-                if not author:
-                    # Create new author
-                    author = models.Author(
-                        name=author_name,
-                        open_library_key=author_key
-                    )
-                    db.add(author)
-                    await db.flush()  # Get author ID without committing
-            
-            # Get cover image
-            cover_id = None
-            if data.get('covers'):
-                cover_id = data['covers'][0]
-            
-            # Create book
-            book = models.Book(
-                title=data.get('title', "Unknown Title"),
-                author_id=author.id if author else None,
-                open_library_key=open_library_key,
-                cover_image_url=f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
-            )
-            
-            db.add(book)
-            await db.commit()
-            await db.refresh(book)
-            
-            return book
-            
+        book = await book_service.post_book_by_open_library_key(db, open_library_key)
+        return schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author=book.author_str,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
     except Exception as e:
         print(f"[DEBUG] Error creating book: {str(e)}")
-        await db.rollback()  # Rollback on error
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/db/open_library/{open_library_key}", response_model=schemas.BookResponse)
+async def get_book_by_open_library_key(
+    open_library_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a book from our database by its Open Library key."""
+    try:
+        book = await book_service.get_book_by_open_library_key(db, open_library_key)
+        return schemas.BookResponse(
+            id=book.id,
+            title=book.title,
+            author_id=book.author_id,
+            author=book.author_str,
+            open_library_key=book.open_library_key,
+            cover_image_url=book.cover_image_url,
+            summary=book.summary,
+            questions_and_answers=book.questions_and_answers,
+            affiliate_links=book.affiliate_links,
+            created_at=book.created_at,
+            updated_at=book.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{book_id}/summary")
@@ -178,21 +175,6 @@ async def get_book_summary(
         raise HTTPException(status_code=404, detail="Book not found")
     
     return {"summary": book.summary or "No summary available yet."}
-
-@router.get("/{book_id}/qa")
-async def get_book_qa(
-    book_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get Q&A for a book."""
-    query = select(models.Book).where(models.Book.id == book_id)
-    result = await db.execute(query)
-    book = result.scalar_one_or_none()
-    
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    
-    return {"qa": book.qa or []}
 
 @router.get("/{book_id}/questions_and_answers")
 async def get_book_questions_and_answers(book_id: int, db: AsyncSession = Depends(get_db)):
@@ -240,7 +222,7 @@ async def list_books(
                 id=book.id,
                 title=book.title,
                 author_id=book.author_id,
-                author_name=book.author.name if book.author else None,
+                author=book.author_str,
                 open_library_key=book.open_library_key,
                 cover_image_url=book.cover_image_url,
                 summary=book.summary,

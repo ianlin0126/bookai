@@ -121,19 +121,22 @@ async function handleSearchInput(event) {
                 return;
             }
             
+            // Limit to 5 results
+            const limitedResults = results.slice(0, 5);
+            
             // Update results
-            searchResults.innerHTML = results.map(book => `
-                <div class="cursor-pointer p-4 hover:bg-gray-100 border-b last:border-b-0" 
+            searchResults.innerHTML = limitedResults.map(book => `
+                <div class="cursor-pointer py-2 px-4 hover:bg-gray-100 border-b last:border-b-0" 
                      onclick="handleBookClick(${book.id})">
                     <div class="flex items-center">
                         ${book.cover_image_url ? 
-                            `<img src="${book.cover_image_url}" alt="${book.title}" class="w-12 h-16 object-cover rounded mr-4">` :
-                            '<div class="w-12 h-16 bg-gray-200 rounded mr-4"></div>'
+                            `<img src="${book.cover_image_url}" alt="${book.title}" class="w-10 h-14 object-cover rounded mr-3">` :
+                            '<div class="w-10 h-14 bg-gray-200 rounded mr-3"></div>'
                         }
-                        <div>
-                            <div class="font-medium text-gray-900">${book.title}</div>
-                            ${book.author_name ? 
-                                `<div class="text-sm text-gray-600">${book.author_name}</div>` : 
+                        <div class="flex flex-col">
+                            <div class="font-medium text-gray-900 text-sm">${book.title}</div>
+                            ${book.author ? 
+                                `<div class="text-xs text-gray-500">${book.author}</div>` : 
                                 ''
                             }
                         </div>
@@ -176,7 +179,7 @@ async function loadPopularBooks() {
                 }
                 <div class="p-4">
                     <h3 class="font-medium text-gray-900">${book.title}</h3>
-                    ${book.author_name ? `<p class="text-sm text-gray-600">${book.author_name}</p>` : ''}
+                    ${book.author ? `<p class="text-sm text-gray-600">${book.author}</p>` : ''}
                 </div>
             </div>
         `).join('');
@@ -277,7 +280,7 @@ async function showBookDetails(bookId) {
                     </div>
                     <div class="book-info">
                         <h3>${book.title}</h3>
-                        <p class="author">by ${book.author_name || 'Unknown Author'}</p>
+                        <p class="author">by ${book.author || 'Unknown Author'}</p>
                         ${book.publication_year ? `<p class="year">Published: ${book.publication_year}</p>` : ''}
                     </div>
                 </div>

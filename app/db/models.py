@@ -26,7 +26,12 @@ class Book(Base):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._author_name = None
+        self._author = None
+
+    @property
+    def author_str(self) -> str:
+        """Get the author's name."""
+        return self.author.name if self.author else None
 
 class Author(Base):
     __tablename__ = "authors"
