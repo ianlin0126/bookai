@@ -101,7 +101,7 @@ async def search_book_by_open_library_key(open_library_key: str):
                 "open_library_key": open_library_key,
                 "cover_image_url": cover_url,
                 "description": book_data.get('description', {}).get('value') if isinstance(book_data.get('description'), dict) else book_data.get('description'),
-                "first_publish_date": book_data.get('first_publish_date')
+                "first_publish_year": book_data.get('first_publish_year')
             }
             
     except httpx.RequestError as e:

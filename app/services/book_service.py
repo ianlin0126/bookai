@@ -302,39 +302,3 @@ async def post_book_by_open_library_key(
         except Exception as e:
             print(f"[DEBUG] Error creating book: {str(e)}")
             raise
-
-def clean_json_string(json_str: str) -> str:
-    """Clean a string to ensure it's valid JSON."""
-    # Remove any text before the first {
-    start_idx = json_str.find('{')
-    if start_idx == -1:
-        raise ValueError("No JSON object found in string")
-    json_str = json_str[start_idx:]
-    
-    # Remove any text after the last }
-    end_idx = json_str.rfind('}')
-    if end_idx == -1:
-        raise ValueError("No closing brace found in JSON string")
-    json_str = json_str[:end_idx + 1]
-    
-    # Replace invalid control characters
-    json_str = ''.join(char for char in json_str if ord(char) >= 32 or char in '\n\r\t')
-    
-    # Fix common JSON formatting issues
-    json_str = json_str.replace('\n', ' ')
-    json_str = json_str.replace('\r', ' ')
-    json_str = json_str.replace('\t', ' ')
-    json_str = json_str.replace('\\n', ' ')
-    json_str = json_str.replace('\\r', ' ')
-    json_str = json_str.replace('\\t', ' ')
-    
-    # Remove multiple spaces
-    json_str = ' '.join(json_str.split())
-    
-    try:
-        # Try to parse and re-stringify to ensure valid JSON
-        parsed = json.loads(json_str)
-        return json.dumps(parsed)
-    except json.JSONDecodeError as e:
-        print(f"Failed to clean JSON: {str(e)}, Original string: {json_str}")
-        raise

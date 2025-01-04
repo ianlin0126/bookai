@@ -46,22 +46,6 @@ Please ensure:
 6. Do not use newlines or special characters in text fields.
 7. Use simple quotes for strings to avoid escaping issues."""
 
-def clean_json_string(json_str: str) -> str:
-    """Clean a string to ensure it's valid JSON."""
-    # Remove any text before the first {
-    start_idx = json_str.find('{')
-    if start_idx == -1:
-        raise ValueError("No JSON object found in string")
-    json_str = json_str[start_idx:]
-    
-    # Remove any text after the last }
-    end_idx = json_str.rfind('}')
-    if end_idx == -1:
-        raise ValueError("Invalid JSON format: missing closing brace")
-    json_str = json_str[:end_idx + 1]
-    
-    return json_str
-
 @router.post("/query")
 async def query_llm(
     request: BookRequest,
