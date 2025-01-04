@@ -11,6 +11,7 @@ const bookSummary = document.getElementById('book-summary');
 const bookQA = document.getElementById('book-qa');
 const loadingState = document.getElementById('loading-state');
 const refreshButton = document.getElementById('refresh-button');
+const searchForm = document.getElementById('search-form'); // Added this line
 
 let currentBookId = null;
 
@@ -74,7 +75,7 @@ function handleSearchKeydown(event) {
                 // If no suggestion is selected, perform a full search
                 const query = searchInput.value.trim();
                 if (query) {
-                    window.location.href = `/search/books?q=${encodeURIComponent(query)}`;
+                    window.location.href = `/search/books/view?q=${encodeURIComponent(query)}`;
                 }
             }
             break;
@@ -418,3 +419,12 @@ loadPopularBooks();
 if (refreshButton) {
     refreshButton.addEventListener('click', refreshBookDigest);
 }
+
+// Handle search form submission
+searchForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const query = searchInput.value.trim();
+    if (query) {
+        window.location.href = `/search/books/view?q=${encodeURIComponent(query)}`;
+    }
+});

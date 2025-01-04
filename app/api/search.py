@@ -32,3 +32,34 @@ async def search_books(
         return await search_service.search_books(db, q, page, per_page)
     except Exception as e:
         return "An error occurred while searching. Please try again."
+
+@router.get("/books/view")
+async def view_search_books(
+    request: Request,
+    q: str = Query(..., min_length=1),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db)
+):
+    """Search for books and return HTML page."""
+    try:
+        books = await search_service.search_books(db, q, page, per_page)
+        return templates.TemplateResponse(
+            "search_results.html",
+            {
+                "request": request,
+                "query": q,
+                "books": books,
+                "error": None
+            }
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "search_results.html",
+            {
+                "request": request,
+                "query": q,
+                "books": [],
+                "error": str(e)
+            }
+        )
