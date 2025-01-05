@@ -414,6 +414,20 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
     }
 };
 
+// Record a book visit
+async function recordVisit(bookId) {
+    try {
+        const response = await fetch(`/analytics/visit/${bookId}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            console.error('Failed to record visit:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error recording visit:', error);
+    }
+}
+
 // Show book details
 async function showBookDetails(bookId) {
     try {
@@ -427,6 +441,9 @@ async function showBookDetails(bookId) {
         
         // Show loading state
         if (loadingState) loadingState.classList.remove('hidden');
+        
+        // Record the visit first
+        await recordVisit(bookId);
         
         // Fetch book data
         const response = await fetch(`/books/${bookId}`);
