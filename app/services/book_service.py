@@ -214,9 +214,10 @@ async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[schemas.B
 async def get_book_by_open_library_key(
     db: AsyncSession,
     open_library_key: str,
-) -> models.Book:
+) -> Optional[models.Book]:
     """
     Get a book by Open Library key from the database.
+    Returns None if no book is found.
     """
     print(f"[DEBUG] get_book_by_open_library_key called with key: {open_library_key}")
     
@@ -233,7 +234,8 @@ async def get_book_by_open_library_key(
         print(f"[DEBUG] Found existing book: {book.title}")
         return book
     else:
-        raise ValueError(f"Book with Open Library key {open_library_key} not found")
+        print(f"[DEBUG] No book found with key: {open_library_key}")
+        return None
 
 async def post_book_by_open_library_key(
     db: AsyncSession,

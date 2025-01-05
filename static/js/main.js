@@ -385,26 +385,42 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
         if (response.ok) {            
             // Book exists
             book = await response.json();
-        } else {
-            // Book doesn't exist, create it
-            const createResponse = await fetch(`/books/open_library/${openLibraryKey}`, {
-                method: 'POST'
-            });
-            
-            if (createResponse.ok) {
-                book = await createResponse.json();
-            } else {
-                console.error('Failed to create book:', await createResponse.text());
-                modalContent.innerHTML = `
-                    <div class="text-red-600 p-4">
-                        Failed to load book details. Please try again later.
-                    </div>`;
-                return;
+            if (!book) {
+                // Book not found in our database, create it
+                const createResponse = await fetch(`/books/open_library/${openLibraryKey}`, {
+                    method: 'POST'
+                });
+                
+                if (createResponse.ok) {
+                    book = await createResponse.json();
+                } else {
+                    console.error('Failed to create book:', await createResponse.text());
+                    modalContent.innerHTML = `
+                        <div class="text-red-600 p-4">
+                            Failed to load book details. Please try again later.
+                        </div>`;
+                    return;
+                }
             }
+        } else {
+            console.error('Failed to check book:', await response.text());
+            modalContent.innerHTML = `
+                <div class="text-red-600 p-4">
+                    Failed to load book details. Please try again later.
+                </div>`;
+            return;
         }
         
         // Show book details
-        await showBookDetails(book.id);
+        if (book && book.id) {
+            await showBookDetails(book.id);
+        } else {
+            console.error('Invalid book data:', book);
+            modalContent.innerHTML = `
+                <div class="text-red-600 p-4">
+                    Failed to load book details. Please try again later.
+                </div>`;
+        }
     } catch (error) {
         console.error('Error handling Open Library book click:', error);
         modalContent.innerHTML = `

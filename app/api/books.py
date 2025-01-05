@@ -9,7 +9,7 @@ from datetime import datetime
 
 from app.db.database import get_db
 from app.db import schemas, models
-from app.services import book_service
+from app.services import book_service, analytics_service
 from app.core.exceptions import BookNotFoundError
 import httpx
 
@@ -37,6 +37,9 @@ async def get_book(
         
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
+        
+        # Record the visit
+        await analytics_service.record_visit(db, book_id)
         
         return schemas.BookResponse(
             id=book.id,
@@ -157,14 +160,20 @@ async def create_book_from_open_library(
         print(f"[DEBUG] Error creating book: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/db/open_library/{open_library_key}", response_model=schemas.BookResponse)
+@router.get("/db/open_library/{open_library_key}", response_model=Optional[schemas.BookResponse])
 async def get_book_by_open_library_key(
     open_library_key: str,
     db: AsyncSession = Depends(get_db)
-):
+) -> Optional[schemas.BookResponse]:
     """Get a book from our database by its Open Library key."""
     try:
         book = await book_service.get_book_by_open_library_key(db, open_library_key)
+        if not book:
+            return None
+            
+        # Record the visit
+        await analytics_service.record_visit(db, book.id)
+            
         return schemas.BookResponse(
             id=book.id,
             title=book.title,
@@ -178,10 +187,10 @@ async def get_book_by_open_library_key(
             created_at=book.created_at,
             updated_at=book.updated_at
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log unexpected errors but don't expose them to client
+        print(f"[ERROR] Unexpected error in get_book_by_open_library_key: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/{book_id}/summary")
 async def get_book_summary(
