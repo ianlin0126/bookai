@@ -76,7 +76,7 @@ def convert_to_small_cover(url: Optional[str]) -> Optional[str]:
         return None
     return re.sub(r'-[LM]\.jpg$', '-S.jpg', url)
 
-async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: int = 10) -> List[Dict[str, Any]]:
+async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: int = 12) -> List[Dict[str, Any]]:
     """Search for books using Open Library API."""
     try:
         print("[DEBUG] Searching Open Library with query:", query)

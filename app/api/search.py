@@ -24,7 +24,7 @@ async def search_books(
     request: Request,
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=50),
+    per_page: int = Query(12, ge=1, le=50),
     db: AsyncSession = Depends(get_db)
 ):
     """Search for books and return json response."""
@@ -38,7 +38,7 @@ async def view_search_books(
     request: Request,
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=50),
+    per_page: int = Query(12, ge=1, le=50),
     db: AsyncSession = Depends(get_db)
 ):
     """Search for books and return HTML page."""

@@ -11,7 +11,7 @@ const bookSummary = document.getElementById('book-summary');
 const bookQA = document.getElementById('book-qa');
 const refreshButton = document.getElementById('refresh-button');
 const loadingState = document.getElementById('loading-state');
-const searchForm = document.getElementById('search-form'); // Added this line
+const searchForm = document.getElementById('search-form');
 
 let currentBookId = null;
 
@@ -39,7 +39,7 @@ function createBookCard(book, onclick) {
     return `
         <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
              onclick="${onclick}">
-            <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
+            <div class="h-[280px] bg-white flex items-center justify-center overflow-hidden">
                 ${book.cover_image_url ? 
                     `<img src="${getMediumCoverUrl(book.cover_image_url)}" 
                          alt="${book.title}" 
@@ -480,7 +480,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Load popular books on page load
-loadPopularBooks();
+if (popularBooks) {
+    loadPopularBooks();
+}
 
 // Event listeners
 if (refreshButton) {
@@ -488,10 +490,12 @@ if (refreshButton) {
 }
 
 // Handle search form submission
-searchForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const query = searchInput.value.trim();
-    if (query) {
-        window.location.href = `/search/books/view?q=${encodeURIComponent(query)}`;
-    }
-});
+if (searchForm) {
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (query) {
+            window.location.href = `/search/books/view?q=${encodeURIComponent(query)}`;
+        }
+    });
+}
