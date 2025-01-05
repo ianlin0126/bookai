@@ -199,20 +199,107 @@ document.addEventListener('click', (event) => {
 });
 
 // Load popular books
-async function loadPopularBooks() {
+let isLoadingMoreBooks = false;
+let currentPage = 1;
+let hasMoreBooks = true;
+
+async function loadPopularBooks(appendToExisting = false) {
+    if (isLoadingMoreBooks || (!appendToExisting && !hasMoreBooks)) return;
+    
     try {
-        const response = await fetch('/analytics/popular');
+        isLoadingMoreBooks = true;
+        const url = `/analytics/popular?page=${currentPage}&per_page=12`;
+        const response = await fetch(url);
         if (!response.ok) {
             throw new Error('Failed to load popular books');
         }
         const books = await response.json();
         
-        popularBooks.innerHTML = books.map(book => 
+        if (!books.length) {
+            hasMoreBooks = false;
+            return;
+        }
+        
+        // Get pagination info from the first book
+        if (books[0]) {
+            hasMoreBooks = books[0]._has_more;
+            currentPage = books[0]._page;
+        }
+        
+        const booksHtml = books.map(book => 
             createBookCard(book, `handleBookClick(${book.id})`)
         ).join('');
+        
+        if (appendToExisting) {
+            popularBooks.insertAdjacentHTML('beforeend', booksHtml);
+        } else {
+            popularBooks.innerHTML = booksHtml;
+        }
+        
+        if (hasMoreBooks) {
+            currentPage++;
+            
+            // Add loading indicator at the bottom
+            const loadingHtml = `
+                <div id="books-loading" class="w-full text-center py-4">
+                    <div class="inline-flex items-center px-4 py-2 text-sm text-sky-500">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading more books...
+                    </div>
+                </div>
+            `;
+            popularBooks.insertAdjacentHTML('beforeend', loadingHtml);
+            
+            // Remove loading indicator after a short delay
+            setTimeout(() => {
+                const loader = document.getElementById('books-loading');
+                if (loader) loader.remove();
+            }, 500);
+        }
     } catch (error) {
         console.error('Error loading popular books:', error);
+        if (!appendToExisting) {
+            popularBooks.innerHTML = '<p class="text-red-600">Error loading popular books</p>';
+        }
+    } finally {
+        isLoadingMoreBooks = false;
     }
+}
+
+// Initialize infinite scroll
+const observeLastBook = () => {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && hasMoreBooks && !isLoadingMoreBooks) {
+                loadPopularBooks(true);
+            }
+        });
+    }, { threshold: 0.1 });
+    
+    // Update observed element when content changes
+    const updateObserver = () => {
+        const bookCards = popularBooks.querySelectorAll('.book-card');
+        if (bookCards.length > 0) {
+            observer.disconnect();
+            observer.observe(bookCards[bookCards.length - 1]);
+        }
+    };
+    
+    // Watch for DOM changes
+    const mutationObserver = new MutationObserver(updateObserver);
+    mutationObserver.observe(popularBooks, { childList: true });
+    
+    // Initial observation
+    updateObserver();
+};
+
+// Load popular books on page load
+if (popularBooks) {
+    loadPopularBooks();
+    observeLastBook();
 }
 
 // Handle book click for popular books
@@ -517,11 +604,6 @@ document.addEventListener('keydown', (e) => {
         closeModal();
     }
 });
-
-// Load popular books on page load
-if (popularBooks) {
-    loadPopularBooks();
-}
 
 // Event listeners
 if (refreshButton) {
