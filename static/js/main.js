@@ -259,6 +259,37 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
         if (searchResults) {
             searchResults.classList.add('hidden');
         }
+
+        // Show modal and loading state
+        bookModal.classList.remove('hidden');
+        
+        // Clear old content and show loading placeholders
+        modalTitle.textContent = '';
+        modalAuthor.textContent = '';
+        bookCover.innerHTML = '<div class="w-full h-full bg-gray-200 animate-pulse"></div>';
+        bookSummary.innerHTML = `
+            <div class="space-y-3">
+                <div class="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                <div class="h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div class="h-4 bg-gray-200 rounded animate-pulse w-5/6"></div>
+            </div>`;
+        bookQA.innerHTML = `
+            <div class="space-y-4">
+                <div class="border rounded p-3">
+                    <div class="h-4 bg-gray-200 rounded animate-pulse w-2/3 mb-2"></div>
+                    <div class="space-y-2">
+                        <div class="h-3 bg-gray-200 rounded animate-pulse"></div>
+                        <div class="h-3 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                    </div>
+                </div>
+                <div class="border rounded p-3">
+                    <div class="h-4 bg-gray-200 rounded animate-pulse w-2/3 mb-2"></div>
+                    <div class="space-y-2">
+                        <div class="h-3 bg-gray-200 rounded animate-pulse"></div>
+                        <div class="h-3 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                    </div>
+                </div>
+            </div>`;
         
         // First check if book exists in our database
         const response = await fetch(`/books/db/open_library/${openLibraryKey}`);
@@ -277,6 +308,10 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
                 book = await createResponse.json();
             } else {
                 console.error('Failed to create book:', await createResponse.text());
+                modalContent.innerHTML = `
+                    <div class="text-red-600 p-4">
+                        Failed to load book details. Please try again later.
+                    </div>`;
                 return;
             }
         }
@@ -285,6 +320,10 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
         await showBookDetails(book.id);
     } catch (error) {
         console.error('Error handling Open Library book click:', error);
+        modalContent.innerHTML = `
+            <div class="text-red-600 p-4">
+                Error loading book details: ${error.message}
+            </div>`;
     }
 };
 
