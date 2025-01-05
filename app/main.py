@@ -48,6 +48,7 @@ app.include_router(llm.router, prefix="/llm", tags=["llm"])
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")

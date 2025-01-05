@@ -7,6 +7,7 @@ const modalTitle = document.getElementById('modal-title');
 const modalAuthor = document.getElementById('modal-author');
 const modalContent = document.getElementById('modal-content');
 const bookCover = document.getElementById('book-cover');
+const bookButton = document.getElementById('book-button');
 const bookSummary = document.getElementById('book-summary');
 const bookQA = document.getElementById('book-qa');
 const refreshButton = document.getElementById('refresh-button');
@@ -353,27 +354,28 @@ window.handleOpenLibraryBookClick = async function(openLibraryKey) {
         // Clear old content and show loading placeholders
         modalTitle.textContent = '';
         modalAuthor.textContent = '';
-        bookCover.innerHTML = '<div class="w-full h-full bg-gray-200 animate-pulse"></div>';
+        bookCover.innerHTML = '<div class="w-full h-full bg-gray-100 animate-pulse"></div>';
+        if (bookButton) bookButton.innerHTML = '';
         bookSummary.innerHTML = `
             <div class="space-y-3">
-                <div class="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
-                <div class="h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div class="h-4 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                <div class="h-4 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
+                <div class="h-4 bg-gray-100 rounded animate-pulse w-5/6"></div>
             </div>`;
         bookQA.innerHTML = `
             <div class="space-y-4">
                 <div class="border rounded p-3">
-                    <div class="h-4 bg-gray-200 rounded animate-pulse w-2/3 mb-2"></div>
+                    <div class="h-4 bg-gray-100 rounded animate-pulse w-2/3 mb-2"></div>
                     <div class="space-y-2">
-                        <div class="h-3 bg-gray-200 rounded animate-pulse"></div>
-                        <div class="h-3 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                        <div class="h-3 bg-gray-100 rounded animate-pulse"></div>
+                        <div class="h-3 bg-gray-100 rounded animate-pulse w-5/6"></div>
                     </div>
                 </div>
                 <div class="border rounded p-3">
-                    <div class="h-4 bg-gray-200 rounded animate-pulse w-2/3 mb-2"></div>
+                    <div class="h-4 bg-gray-100 rounded animate-pulse w-2/3 mb-2"></div>
                     <div class="space-y-2">
-                        <div class="h-3 bg-gray-200 rounded animate-pulse"></div>
-                        <div class="h-3 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                        <div class="h-3 bg-gray-100 rounded animate-pulse"></div>
+                        <div class="h-3 bg-gray-100 rounded animate-pulse w-5/6"></div>
                     </div>
                 </div>
             </div>`;
@@ -474,11 +476,24 @@ async function showBookDetails(bookId) {
         if (modalTitle) modalTitle.textContent = book.title;
         if (modalAuthor) modalAuthor.textContent = `by ${book.author || 'Unknown Author'}`;
         
-        // Update book cover
+        // Update book cover and button
         if (bookCover) {
             bookCover.innerHTML = book.cover_image_url 
                 ? `<img src="${book.cover_image_url}" alt="${book.title} cover" class="w-full h-full object-cover">` 
                 : '<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">No cover available</div>';
+        }
+        
+        if (bookButton) {
+            if (book.affiliate_links) {
+                bookButton.innerHTML = `
+                    <a href="${book.affiliate_links}" target="_blank" rel="noopener noreferrer" class="inline-block">
+                        <img src="/assets/buy-on-amazon-button-png-3-300x111.png" 
+                             alt="Buy on Amazon" 
+                             class="w-full max-w-[125px] hover:opacity-90 transition-opacity">
+                    </a>`;
+            } else {
+                bookButton.innerHTML = '';
+            }
         }
         
         // Update summary and hide refresh button if summary exists

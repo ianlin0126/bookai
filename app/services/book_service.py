@@ -8,7 +8,7 @@ import httpx
 
 from app.db import models, schemas
 from app.services import llm_service
-from app.core.utils import clean_json_string, validate_book_metadata
+from app.core.utils import clean_json_string, validate_book_metadata, create_amazon_affiliate_link
 from app.api.llm import generate_book_digest_prompt
 
 async def get_book(db: AsyncSession, book_id: int) -> models.Book:
@@ -55,13 +55,17 @@ async def create_book_with_author(
         await db.commit()  # Commit to ensure author is created
         await db.refresh(author)  # Refresh to get all fields
     
+    # Generate affiliate link
+    affiliate_link = create_amazon_affiliate_link(title, author_name)
+    
     # Create new book
     book = models.Book(
         title=title,
         author=author,
         publication_year=publication_year,
         open_library_key=open_library_key,
-        cover_image_url=cover_image_url
+        cover_image_url=cover_image_url,
+        affiliate_links=affiliate_link
     )
     db.add(book)
     await db.commit()

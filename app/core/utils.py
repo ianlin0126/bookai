@@ -1,6 +1,8 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import json
 from thefuzz import fuzz
+from urllib.parse import quote
+import os
 
 def clean_json_string(json_str: str) -> str:
     """Clean a string to ensure it's valid JSON."""
@@ -73,3 +75,32 @@ def validate_book_metadata(digest: dict, book_title: str, book_author: str, thre
             return False, f"Author mismatch: LLM response '{digest_author}' doesn't match book author '{book_author}' (match score: {author_ratio})"
     
     return True, ""
+
+def create_amazon_affiliate_link(book_title: str, author: Optional[str] = None) -> str:
+    """
+    Create an Amazon affiliate link for a book search.
+    
+    Args:
+        book_title: The title of the book
+        author: Optional author name
+        
+    Returns:
+        str: Amazon affiliate link with search query and affiliate tag
+        
+    Example:
+        >>> create_amazon_affiliate_link("The Great Gatsby", "F. Scott Fitzgerald")
+        'https://www.amazon.com/s?k=The+Great+Gatsby+F.+Scott+Fitzgerald&tag=your-tag-20'
+    """
+    # Get affiliate ID from environment
+    affiliate_id = os.getenv('AMAZON_AFFILIATE_ID', 'httppinteco01-20')
+    
+    # Clean and encode search terms
+    search_terms = [book_title]
+    if author:
+        search_terms.append(author)
+    
+    # Join with space and encode for URL
+    search_query = quote(' '.join(search_terms))
+    
+    # Create affiliate link
+    return f"https://www.amazon.com/s?k={search_query}&tag={affiliate_id}"
