@@ -9,8 +9,8 @@ const modalContent = document.getElementById('modal-content');
 const bookCover = document.getElementById('book-cover');
 const bookSummary = document.getElementById('book-summary');
 const bookQA = document.getElementById('book-qa');
-const loadingState = document.getElementById('loading-state');
 const refreshButton = document.getElementById('refresh-button');
+const loadingState = document.getElementById('loading-state');
 const searchForm = document.getElementById('search-form'); // Added this line
 
 let currentBookId = null;
@@ -186,7 +186,7 @@ async function loadPopularBooks() {
         const books = await response.json();
         
         popularBooks.innerHTML = books.map(book => `
-            <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
                  onclick="handleBookClick(${book.id})">
                 <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
                     ${book.cover_image_url ? 
@@ -208,7 +208,7 @@ async function loadPopularBooks() {
     }
 }
 
-// Handle book click
+// Handle book click for popular books
 async function handleBookClick(bookId) {
     try {
         searchResults.classList.add('hidden');
@@ -246,14 +246,54 @@ async function handleBookClick(bookId) {
     }
 }
 
+// Make the function globally available for onclick handlers
+window.handleOpenLibraryBookClick = async function(openLibraryKey) {
+    try {
+        if (searchResults) {
+            searchResults.classList.add('hidden');
+        }
+        
+        // First check if book exists in our database
+        const response = await fetch(`/books/db/open_library/${openLibraryKey}`);
+        
+        let book;
+        if (response.ok) {            
+            // Book exists
+            book = await response.json();
+        } else {
+            // Book doesn't exist, create it
+            const createResponse = await fetch(`/books/open_library/${openLibraryKey}`, {
+                method: 'POST'
+            });
+            
+            if (createResponse.ok) {
+                book = await createResponse.json();
+            } else {
+                console.error('Failed to create book:', await createResponse.text());
+                return;
+            }
+        }
+        
+        // Show book details
+        await showBookDetails(book.id);
+    } catch (error) {
+        console.error('Error handling Open Library book click:', error);
+    }
+};
+
 // Show book details
 async function showBookDetails(bookId) {
     try {
+        if (!bookModal) {
+            console.error('Modal elements not found');
+            return;
+        }
+
         currentBookId = bookId;
         console.log('Fetching book details for ID:', bookId);
         
         // Show loading state
-        loadingState.classList.remove('hidden');
+        if (loadingState) loadingState.classList.remove('hidden');
         
         // Fetch book data
         const response = await fetch(`/books/${bookId}`);
@@ -265,39 +305,47 @@ async function showBookDetails(bookId) {
         console.log('Book data:', book);
         
         // Update modal content
-        modalTitle.textContent = book.title;
-        modalAuthor.textContent = `by ${book.author || 'Unknown Author'}`;
+        if (modalTitle) modalTitle.textContent = book.title;
+        if (modalAuthor) modalAuthor.textContent = `by ${book.author || 'Unknown Author'}`;
         
         // Update book cover
-        bookCover.innerHTML = book.cover_image_url 
-            ? `<img src="${book.cover_image_url}" alt="${book.title} cover" class="w-full h-full object-cover">` 
-            : '<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">No cover available</div>';
+        if (bookCover) {
+            bookCover.innerHTML = book.cover_image_url 
+                ? `<img src="${book.cover_image_url}" alt="${book.title} cover" class="w-full h-full object-cover">` 
+                : '<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">No cover available</div>';
+        }
         
         // Update summary
-        bookSummary.innerHTML = book.summary 
-            ? `<p>${book.summary}</p>`
-            : '<p class="text-gray-500">No summary available yet.</p>';
+        if (bookSummary) {
+            bookSummary.innerHTML = book.summary 
+                ? `<p>${book.summary}</p>`
+                : '<p class="text-gray-500">No summary available yet.</p>';
+        }
             
         // Show/hide refresh button based on summary existence
-        refreshButton.classList.toggle('hidden', !!book.summary);
-        refreshButton.textContent = 'AI Summarize';
+        if (refreshButton) {
+            refreshButton.classList.toggle('hidden', !!book.summary);
+            refreshButton.textContent = 'AI Summarize';
+        }
         
         // Update Q&A
-        if (book.questions_and_answers) {
-            try {
-                const qa = JSON.parse(book.questions_and_answers);
-                bookQA.innerHTML = qa.map((item, index) => `
-                    <div class="qa-item bg-gray-50 p-4 rounded-lg">
-                        <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${item.question}</h5>
-                        <p class="text-gray-600">${item.answer}</p>
-                    </div>
-                `).join('');
-            } catch (e) {
-                console.error('Error parsing Q&A:', e);
-                bookQA.innerHTML = '<p class="text-gray-500">Error loading questions and answers.</p>';
+        if (bookQA) {
+            if (book.questions_and_answers) {
+                try {
+                    const qa = JSON.parse(book.questions_and_answers);
+                    bookQA.innerHTML = qa.map((item, index) => `
+                        <div class="qa-item bg-gray-50 p-4 rounded-lg">
+                            <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${item.question}</h5>
+                            <p class="text-gray-600">${item.answer}</p>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    console.error('Error parsing Q&A:', e);
+                    bookQA.innerHTML = '<p class="text-gray-500">Error loading questions and answers.</p>';
+                }
+            } else {
+                bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available yet.</p>';
             }
-        } else {
-            bookQA.innerHTML = '<p class="text-gray-500">No questions and answers available yet.</p>';
         }
         
         // Show modal
@@ -306,13 +354,15 @@ async function showBookDetails(bookId) {
     } catch (error) {
         console.error('Error showing book details:', error);
         // Show error in modal
-        modalContent.innerHTML = `
-            <div class="text-red-600 p-4">
-                Error loading book details: ${error.message}
-            </div>
-        `;
+        if (modalContent) {
+            modalContent.innerHTML = `
+                <div class="text-red-600 p-4">
+                    Error loading book details: ${error.message}
+                </div>
+            `;
+        }
     } finally {
-        loadingState.classList.add('hidden');
+        if (loadingState) loadingState.classList.add('hidden');
     }
 }
 
