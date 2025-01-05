@@ -34,6 +34,28 @@ function getMediumCoverUrl(url) {
     return url.replace(/-[LS]\.jpg$/, '-M.jpg');
 }
 
+// Create book card HTML
+function createBookCard(book, onclick) {
+    return `
+        <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
+             onclick="${onclick}">
+            <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
+                ${book.cover_image_url ? 
+                    `<img src="${getMediumCoverUrl(book.cover_image_url)}" 
+                         alt="${book.title}" 
+                         class="h-full w-auto object-contain"
+                         style="min-height: 100%;">` :
+                    '<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">No cover</div>'
+                }
+            </div>
+            <div class="p-2">
+                <h3 class="font-medium text-gray-900 text-sm line-clamp-1">${book.title}</h3>
+                ${book.author ? `<p class="text-xs text-gray-600 line-clamp-1">${book.author}</p>` : ''}
+            </div>
+        </div>
+    `;
+}
+
 // Search functionality
 let currentSearchTimeout = null;
 let selectedSearchIndex = -1;
@@ -185,24 +207,9 @@ async function loadPopularBooks() {
         }
         const books = await response.json();
         
-        popularBooks.innerHTML = books.map(book => `
-            <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
-                 onclick="handleBookClick(${book.id})">
-                <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
-                    ${book.cover_image_url ? 
-                        `<img src="${getMediumCoverUrl(book.cover_image_url)}" 
-                             alt="${book.title}" 
-                             class="h-full w-auto object-contain"
-                             style="min-height: 100%;">` :
-                        '<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">No cover</div>'
-                    }
-                </div>
-                <div class="p-2">
-                    <h3 class="font-medium text-gray-900 text-sm line-clamp-1">${book.title}</h3>
-                    ${book.author ? `<p class="text-xs text-gray-600 line-clamp-1">${book.author}</p>` : ''}
-                </div>
-            </div>
-        `).join('');
+        popularBooks.innerHTML = books.map(book => 
+            createBookCard(book, `handleBookClick(${book.id})`)
+        ).join('');
     } catch (error) {
         console.error('Error loading popular books:', error);
     }
@@ -315,17 +322,21 @@ async function showBookDetails(bookId) {
                 : '<div class="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">No cover available</div>';
         }
         
-        // Update summary
+        // Update summary and hide refresh button if summary exists
         if (bookSummary) {
             bookSummary.innerHTML = book.summary 
                 ? `<p>${book.summary}</p>`
                 : '<p class="text-gray-500">No summary available yet.</p>';
         }
             
-        // Show/hide refresh button based on summary existence
+        // Show refresh button only if no summary exists
         if (refreshButton) {
-            refreshButton.classList.toggle('hidden', !!book.summary);
-            refreshButton.textContent = 'AI Summarize';
+            if (book.summary) {
+                refreshButton.classList.add('hidden');
+            } else {
+                refreshButton.classList.remove('hidden');
+                refreshButton.textContent = 'AI Summarize';
+            }
         }
         
         // Update Q&A
@@ -398,11 +409,17 @@ async function refreshBookDigest() {
         const book = await response.json();
         console.log('Refreshed book data:', book);
         
-        // Update summary and Q&A sections
+        // Update summary and hide refresh button
         bookSummary.innerHTML = book.summary 
             ? `<p>${book.summary}</p>`
             : '<p class="text-gray-500">No summary available.</p>';
+            
+        // Hide refresh button if summary was generated
+        if (book.summary) {
+            refreshButton.classList.add('hidden');
+        }
         
+        // Update Q&A
         if (book.questions_and_answers) {
             try {
                 const qa = JSON.parse(book.questions_and_answers);

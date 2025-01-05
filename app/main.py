@@ -50,7 +50,7 @@ app.include_router(llm.router, prefix="/llm", tags=["llm"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Templates
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/")
 async def home(request: Request):

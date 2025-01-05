@@ -1,5 +1,27 @@
 {% extends "base.html" %}
 
+{% macro book_card(book, onclick) %}
+<div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
+     onclick="{{ onclick }}">
+    <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
+        {% if book.cover_image_url %}
+        <img src="{{ book.cover_image_url|replace('-L.jpg', '-M.jpg')|replace('-S.jpg', '-M.jpg') }}" 
+             alt="{{ book.title }}" 
+             class="h-full w-auto object-contain"
+             style="min-height: 100%;">
+        {% else %}
+        <div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">No cover</div>
+        {% endif %}
+    </div>
+    <div class="p-2">
+        <h3 class="font-medium text-gray-900 text-sm line-clamp-1">{{ book.title }}</h3>
+        {% if book.author %}
+        <p class="text-xs text-gray-600 line-clamp-1">{{ book.author }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="mb-8">
@@ -10,25 +32,7 @@
     {% if books %}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 justify-items-center">
         {% for book in books %}
-        <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
-             onclick="handleOpenLibraryBookClick('{{ book.open_library_key }}')">
-            <div class="h-[180px] bg-white flex items-center justify-center overflow-hidden">
-                {% if book.cover_image_url %}
-                <img src="{{ book.cover_image_url }}" 
-                     alt="{{ book.title }}" 
-                     class="h-full w-auto object-contain"
-                     style="min-height: 100%;">
-                {% else %}
-                <div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">No cover</div>
-                {% endif %}
-            </div>
-            <div class="p-2">
-                <h3 class="font-medium text-gray-900 text-sm line-clamp-1">{{ book.title }}</h3>
-                {% if book.author %}
-                <p class="text-xs text-gray-600 line-clamp-1">{{ book.author }}</p>
-                {% endif %}
-            </div>
-        </div>
+            {{ book_card(book, "handleOpenLibraryBookClick('" ~ book.open_library_key ~ "')") }}
         {% endfor %}
     </div>
     {% else %}
