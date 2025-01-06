@@ -160,7 +160,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', path='js/main.js') }}"></script>
+    <script src="{{ request.base_url }}static/js/main.js"></script>
     <script>
         // Initialize clear button visibility
         document.addEventListener('DOMContentLoaded', function() {
