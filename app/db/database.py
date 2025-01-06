@@ -47,18 +47,20 @@ if "postgresql+asyncpg" not in DATABASE_URL:
 
 logger.info(f"Using database URL: {masked_url}")
 
+# Create SSL context for Railway
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+
 # Create engine with appropriate settings
 engine_kwargs = {
     "echo": True,
     "pool_size": 20,
     "max_overflow": 10,
-    # Configure SSL for Railway PostgreSQL
     "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
-        "server_settings": {
-            "ssl": "true"
-        }
+        "ssl": ssl_context
     }
 }
 
