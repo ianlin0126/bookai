@@ -22,10 +22,6 @@ async def create_book(book: schemas.BookCreate, db: AsyncSession = Depends(get_d
     """
     return await book_service.create_book(db, book)
 
-@router.get("/popular", response_model=List[schemas.BookResponse])
-async def get_popular_books(limit: int = 10, db: AsyncSession = Depends(get_db)):
-    return await book_service.get_popular_books(db, limit=limit)
-
 @router.get("/{book_id}", response_model=schemas.BookResponse)
 async def get_book(
     book_id: int,

@@ -168,53 +168,6 @@ async def update_book(db: AsyncSession, book_id: int, book_update: schemas.BookC
     await db.refresh(db_book)
     return db_book
 
-async def get_popular_books(db: AsyncSession, limit: int = 10) -> List[schemas.BookResponse]:
-    """Get books with most visits."""
-    # Get books with most visits in the last 30 days
-    today = datetime.today()
-    result = await db.execute(
-        select(models.Visit.book_id, func.sum(models.Visit.visit_count).label('total_visits'))
-        .group_by(models.Visit.book_id)
-        .order_by(func.sum(models.Visit.visit_count).desc())
-        .limit(limit)
-    )
-    visits = result.all()
-    
-    # Get the actual book objects
-    book_ids = [v.book_id for v in visits]
-    if not book_ids:
-        return []
-    
-    result = await db.execute(
-        select(models.Book)
-        .join(models.Author)
-        .where(models.Book.id.in_(book_ids))
-        .options(selectinload(models.Book.author))
-    )
-    books = result.scalars().all()
-    
-    # Sort books by visit count
-    visit_counts = {v.book_id: v.total_visits for v in visits}
-    books.sort(key=lambda b: visit_counts.get(b.id, 0), reverse=True)
-    
-    # Convert to Pydantic models
-    return [
-        schemas.BookResponse(
-            id=book.id,
-            title=book.title,
-            author_id=book.author_id,
-            author=book.author_str,
-            open_library_key=book.open_library_key,
-            cover_image_url=book.cover_image_url,
-            summary=book.summary,
-            questions_and_answers=book.questions_and_answers,
-            affiliate_links=book.affiliate_links,
-            created_at=book.created_at,
-            updated_at=book.updated_at
-        )
-        for book in books
-    ]
-
 async def get_book_by_open_library_key(
     db: AsyncSession,
     open_library_key: str,

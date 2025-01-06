@@ -7,17 +7,17 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
-    DATABASE_URL: str
-    REDIS_URL: str
+    # Database settings with default for local development
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/bookai"
     
-    OPENAI_API_KEY: str
-    GOOGLE_API_KEY: str
-    
-    AMAZON_AFFILIATE_ID: str
-    
-    # Add optional settings
-    DEBUG: Optional[bool] = False
-    LOG_LEVEL: Optional[str] = "INFO"
+    # Optional settings with defaults
+    REDIS_URL: Optional[str] = "redis://localhost:6379"
+    OPENAI_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
+    AMAZON_AFFILIATE_ID: Optional[str] = None
+    ADMIN_TOKEN: Optional[str] = None
+    DEBUG: bool = False
+    LOG_LEVEL: str = "INFO"
     
     class Config:
         env_file = ".env"

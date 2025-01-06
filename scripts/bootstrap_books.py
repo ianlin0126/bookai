@@ -1,13 +1,18 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import SessionLocal
-from app.services import search_service, book_service
+from app.services import search_service, book_service, analytics_service
 from app.core.utils import clean_json_string
 from thefuzz import fuzz
 import asyncio
 import time
 
-async def bootstrap_books():
-    """Bootstrap the database with initial books."""
+async def bootstrap_books(start: int = 0, limit: int = None):
+    """Bootstrap the database with initial books.
+    
+    Args:
+        start (int): Starting index for book titles (default: 0)
+        limit (int): Maximum number of books to process (default: None, process all)
+    """
     book_titles = [
         "To Kill a Mockingbird",
         "1984",
@@ -177,12 +182,20 @@ async def bootstrap_books():
         "The Night Circus"
     ]
 
-    async with SessionLocal() as db:
-        for title in book_titles:
+    # Apply start and limit to book_titles
+    if limit is None:
+        selected_titles = book_titles[start:]
+    else:
+        selected_titles = book_titles[start:start + limit]
+
+    print(f"Processing {len(selected_titles)} books starting from index {start}")
+    
+    async with SessionLocal() as session:
+        for title in selected_titles:
             try:
                 # Step 1: Search Open Library
                 print(f"\nSearching for book: {title}")
-                search_results = await search_service.search_books(db, title, page=1, per_page=1)
+                search_results = await search_service.search_books(session, title, page=1, per_page=1)
                 
                 if not search_results:
                     print(f"No results found for: {title}")
@@ -202,7 +215,7 @@ async def bootstrap_books():
                 
                 # Step 2: Check if book exists
                 try:
-                    existing_book = await book_service.get_book_by_open_library_key(db, open_library_key)
+                    existing_book = await book_service.get_book_by_open_library_key(session, open_library_key)
                     if existing_book:
                         print(f"Book already exists: {title}")
                         continue
@@ -210,8 +223,15 @@ async def bootstrap_books():
                     pass  # Book doesn't exist, continue with creation
                 
                 # Step 3: Create book using Open Library data
-                book = await book_service.post_book_by_open_library_key(db, open_library_key)
+                book = await book_service.post_book_by_open_library_key(session, open_library_key)
                 print(f"Added book: {title} (OpenLibrary key: {open_library_key})")
+                
+                # Record a visit for the new book
+                try:
+                    await analytics_service.record_visit(session, book.id)
+                    print(f"Recorded visit for book: {title}")
+                except Exception as e:
+                    print(f"Error recording visit for book '{title}': {str(e)}")
                 
                 # Add a small delay to avoid rate limiting
                 await asyncio.sleep(1)
