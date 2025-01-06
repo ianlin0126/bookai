@@ -12,19 +12,21 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
+# Ensure we're using the asyncpg driver
+if "sqlite" in DATABASE_URL:
+    raise ValueError("SQLite is not supported. Please use PostgreSQL with asyncpg driver.")
+
+if "postgresql" not in DATABASE_URL:
+    raise ValueError("Only PostgreSQL is supported. Please check your DATABASE_URL.")
+
 logger.info(f"Using database URL: {DATABASE_URL}")
 
-# Create engine with appropriate settings based on database type
+# Create engine with appropriate settings
 engine_kwargs = {
     "echo": True,
+    "pool_size": 20,
+    "max_overflow": 10
 }
-
-# Add PostgreSQL-specific settings only if using PostgreSQL
-if "postgresql" in DATABASE_URL:
-    engine_kwargs.update({
-        "pool_size": 20,
-        "max_overflow": 10
-    })
 
 engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
