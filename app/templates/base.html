@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book AI Summary - Your AI-Powered Book Companion</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">    
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}">    
 
     <!-- Open Graph / Social Media Meta Tags -->
     {% block og_tags %}
@@ -12,10 +12,10 @@
     <meta property="og:description" content="Your AI-Powered Book Companion">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
-    <meta property="og:image" content="{{ request.base_url }}assets/bookai-social.png">
+    <meta property="og:image" content="{{ url_for('static', path='bookai-social.png', include_query_params=True) }}">
     {% endblock %}
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="//cdn.tailwindcss.com"></script>
     <style>
         .line-clamp-2 {
             display: -webkit-box;
@@ -51,7 +51,7 @@
                     <div class="w-full relative">
                         <div class="relative flex items-center">
                             <div class="absolute left-4 flex items-center pointer-events-none">
-                                <img src="/assets/search-svgrepo-com.svg" alt="Search" class="w-5 h-5 text-gray-400">
+                                <img src="{{ url_for('static', path='search-svgrepo-com.svg') }}" alt="Search" class="w-5 h-5 text-gray-400">
                             </div>
                             <input type="text" 
                                    id="search-input"
@@ -160,7 +160,7 @@
         </div>
     </div>
 
-    <script src="{{ request.base_url }}static/js/main.js"></script>
+    <script src="{{ url_for('static', path='js/main.js') }}"></script>
     <script>
         // Initialize clear button visibility
         document.addEventListener('DOMContentLoaded', function() {
