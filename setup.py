@@ -18,6 +18,8 @@ setup(
         "beautifulsoup4==4.12.2",
         "pydantic-settings==2.1.0",
         "jinja2==3.1.2",
-        "httpx==0.25.2"
+        "httpx==0.25.2",
+        "aiosqlite==0.19.0",
+        "greenlet==3.0.1"
     ]
 )

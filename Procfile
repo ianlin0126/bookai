@@ -1,1 +1,1 @@
-web: python -c "import os; port = int(os.getenv('PORT', '8000')); os.system(f'python -m uvicorn app.main:app --host 0.0.0.0 --port {port}')"
+web: python -c "import os; os.environ['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///bookai.db'); port = int(os.getenv('PORT', '8000')); os.system(f'python -m uvicorn app.main:app --host 0.0.0.0 --port {port}')"
