@@ -2,8 +2,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 import logging
+import urllib.parse
+import ssl
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)  # Ensure we see the logs
 
 # Get database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/bookai")
@@ -11,17 +14,23 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres
 # Debug log to see what URL we're getting (mask sensitive parts)
 debug_url = DATABASE_URL
 if debug_url:
-    # Mask username/password if present
-    parts = debug_url.split("@")
-    if len(parts) > 1:
-        masked_credentials = "****:****"
-        debug_url = f"{masked_credentials}@{parts[1]}"
-logger.error(f"Database URL (masked): {debug_url}")  # Using error level for visibility in Railway logs
+    # Parse the URL to mask sensitive parts but show host/port
+    try:
+        parsed = urllib.parse.urlparse(debug_url)
+        masked_url = f"{parsed.scheme}://****:****@{parsed.hostname}:{parsed.port}/{parsed.path.lstrip('/')}"
+        logger.error(f"Initial Database URL (masked): {masked_url}")
+    except Exception as e:
+        logger.error(f"Error parsing DATABASE_URL: {str(e)}")
 
 # Convert URL format if needed (for Railway)
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-    logger.error(f"Converted Database URL (masked): {debug_url}")
+    try:
+        parsed = urllib.parse.urlparse(DATABASE_URL)
+        masked_url = f"{parsed.scheme}://****:****@{parsed.hostname}:{parsed.port}/{parsed.path.lstrip('/')}"
+        logger.error(f"Converted Database URL (masked): {masked_url}")
+    except Exception as e:
+        logger.error(f"Error parsing converted DATABASE_URL: {str(e)}")
 
 # Ensure we're using the asyncpg driver
 if "sqlite" in DATABASE_URL:
@@ -30,16 +39,29 @@ if "sqlite" in DATABASE_URL:
 if "postgresql" not in DATABASE_URL:
     raise ValueError(f"Only PostgreSQL is supported. Please check your DATABASE_URL. Current URL type: {DATABASE_URL.split('://')[0]}")
 
-logger.info(f"Using database URL: {debug_url}")
+logger.info(f"Using database URL: {masked_url}")
 
 # Create engine with appropriate settings
 engine_kwargs = {
     "echo": True,
     "pool_size": 20,
-    "max_overflow": 10
+    "max_overflow": 10,
+    # Configure SSL for Railway PostgreSQL
+    "connect_args": {
+        "ssl": ssl.create_default_context(),
+        "server_settings": {
+            "ssl": "true",
+            "sslmode": "require"
+        }
+    }
 }
 
-engine = create_async_engine(DATABASE_URL, **engine_kwargs)
+try:
+    engine = create_async_engine(DATABASE_URL, **engine_kwargs)
+    logger.info("Successfully created database engine")
+except Exception as e:
+    logger.error(f"Error creating database engine: {str(e)}")
+    raise
 
 SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
