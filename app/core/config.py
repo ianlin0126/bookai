@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     AMAZON_AFFILIATE_ID: Optional[str] = None
-    ADMIN_TOKEN: Optional[str] = None
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     

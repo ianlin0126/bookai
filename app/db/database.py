@@ -14,13 +14,19 @@ if DATABASE_URL.startswith("postgres://"):
 
 logger.info(f"Using database URL: {DATABASE_URL}")
 
-# Create async engine with PostgreSQL-specific settings
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=True,
-    pool_size=20,
-    max_overflow=10
-)
+# Create engine with appropriate settings based on database type
+engine_kwargs = {
+    "echo": True,
+}
+
+# Add PostgreSQL-specific settings only if using PostgreSQL
+if "postgresql" in DATABASE_URL:
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10
+    })
+
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
