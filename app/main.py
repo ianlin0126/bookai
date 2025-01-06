@@ -3,6 +3,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from app.db.database import engine, Base
 from app.api import books, analytics, admin, search, llm
 import os
@@ -14,6 +16,14 @@ logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BookDigest.ai")
+
+# Add security middlewares
+if os.getenv('ENVIRONMENT') == 'production':
+    app.add_middleware(HTTPSRedirectMiddleware)
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["bookai-production.up.railway.app"]
+    )
 
 # Add CORS middleware
 app.add_middleware(
@@ -37,6 +47,36 @@ async def init_db():
         logger.error(f"Error creating database tables: {str(e)}")
         raise  # Raise the error to prevent app from starting with broken DB
 
+# Custom middleware to handle static file URLs
+@app.middleware("http")
+async def rewrite_static_urls(request: Request, call_next):
+    """Ensure static file URLs use HTTPS when in production"""
+    response = await call_next(request)
+    
+    # Only process HTML responses
+    if response.headers.get("content-type") == "text/html; charset=utf-8":
+        # Get the response content
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk
+        
+        # Convert to string and replace http:// with https:// for static files
+        content = body.decode()
+        if os.getenv('ENVIRONMENT') == 'production':
+            content = content.replace(
+                'http://bookai-production.up.railway.app/static/',
+                'https://bookai-production.up.railway.app/static/'
+            )
+        
+        # Create new response with modified content
+        return HTMLResponse(
+            content=content,
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
+    
+    return response
+
 # Ensure static directories exist and mount them
 base_dir = Path(__file__).resolve().parent.parent
 static_dir = base_dir / "static"
@@ -47,7 +87,7 @@ os.makedirs(static_dir, exist_ok=True)
 os.makedirs(js_dir, exist_ok=True)
 
 try:
-    # Mount static directory
+    # Mount static directory with custom HTML handler
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     logger.info(f"Successfully mounted static directory at {static_dir}")
 except Exception as e:

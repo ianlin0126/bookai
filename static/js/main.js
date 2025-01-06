@@ -14,7 +14,13 @@ const refreshButton = document.getElementById('refresh-button');
 const loadingState = document.getElementById('loading-state');
 const searchForm = document.getElementById('search-form');
 
+// Global state
 let currentBookId = null;
+let isLoadingMoreBooks = false;
+let hasMoreBooks = true;
+let currentPage = 1;
+let currentSearchTimeout = null;
+let selectedSearchIndex = -1;
 
 // Debounce function
 function debounce(func, wait) {
@@ -58,9 +64,6 @@ function createBookCard(book, onclick) {
 }
 
 // Search functionality
-let currentSearchTimeout = null;
-let selectedSearchIndex = -1;
-
 if (searchInput && searchResults) {
     searchInput.addEventListener('keydown', handleSearchKeydown);
     searchInput.addEventListener('input', handleSearchInput);
@@ -208,24 +211,31 @@ document.addEventListener('click', (event) => {
 });
 
 // Load popular books
-let isLoadingMoreBooks = false;
-let currentPage = 1;
-let hasMoreBooks = true;
-
 async function loadPopularBooks(appendToExisting = false) {
     if (isLoadingMoreBooks || (!appendToExisting && !hasMoreBooks)) return;
     
     try {
         isLoadingMoreBooks = true;
         const url = `/api/analytics/popular?page=${currentPage}&per_page=12`;
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error('Failed to load popular books');
-        }
-        const books = await response.json();
+        console.log('Fetching popular books from:', url); // Debug log
         
-        if (!books.length) {
+        const response = await fetch(url);
+        console.log('Response status:', response.status); // Debug log
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server response:', errorText); // Debug log
+            throw new Error(`Failed to load popular books: ${response.status} ${errorText}`);
+        }
+        
+        const books = await response.json();
+        console.log('Received books:', books); // Debug log
+        
+        if (!books || !books.length) {
             hasMoreBooks = false;
+            if (!appendToExisting) {
+                popularBooks.innerHTML = '<p class="text-gray-600 text-center py-4">No books available</p>';
+            }
             return;
         }
         
@@ -236,7 +246,7 @@ async function loadPopularBooks(appendToExisting = false) {
         }
         
         const booksHtml = books.map(book => 
-            createBookCard(book, `window.location.href = '/book?id=${book.id}'`)
+            createBookCard(book, `handleBookClick('${book.id}')`)
         ).join('');
         
         if (appendToExisting) {
@@ -271,7 +281,7 @@ async function loadPopularBooks(appendToExisting = false) {
     } catch (error) {
         console.error('Error loading popular books:', error);
         if (!appendToExisting) {
-            popularBooks.innerHTML = '<p class="text-red-600">Error loading popular books</p>';
+            popularBooks.innerHTML = `<p class="text-red-600 text-center py-4">Error loading popular books: ${error.message}</p>`;
         }
     } finally {
         isLoadingMoreBooks = false;
