@@ -31,7 +31,7 @@
     <nav class="bg-white shadow-lg sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between h-16">
-                <div class="flex items-center flex-shrink-0">
+                <div id="logo" class="flex items-center flex-shrink-0 transition-all duration-200 sm:block my-auto">
                     <a href="/" class="flex items-center">
                         <h1 class="text-2xl font-bold text-indigo-600">BookAI</h1>
                     </a>
@@ -44,8 +44,19 @@
                             </div>
                             <input type="text" 
                                    id="search-input"
-                                   class="w-full py-3 pl-12 pr-4 text-base border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                                   placeholder="Search by book title or author...">
+                                   class="w-full py-3 pl-12 pr-10 text-base border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
+                                   placeholder="Search by book title or author..."
+                                   value="{{ query if query else '' }}"
+                                   onfocus="if(window.innerWidth < 640) document.getElementById('logo').classList.add('hidden')"
+                                   onblur="if(window.innerWidth < 640 && document.getElementById('search-results').classList.contains('hidden')) document.getElementById('logo').classList.remove('hidden')"
+                                   oninput="document.getElementById('search-clear').style.display = this.value ? 'flex' : 'none'">
+                            <button id="search-clear" 
+                                    class="absolute right-4 hidden items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600"
+                                    onclick="document.getElementById('search-input').value = ''; this.style.display = 'none'; document.getElementById('search-input').focus();">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
                         </div>
                         <div id="search-results" class="absolute z-50 w-full bg-white mt-2 rounded-2xl shadow-lg hidden overflow-hidden border border-gray-200"></div>
                     </div>
@@ -140,5 +151,15 @@
     </div>
 
     <script src="{{ url_for('static', path='js/main.js') }}"></script>
+    <script>
+        // Initialize clear button visibility
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('search-input');
+            const searchClear = document.getElementById('search-clear');
+            if (searchInput.value) {
+                searchClear.style.display = 'flex';
+            }
+        });
+    </script>
 </body>
 </html>
