@@ -27,25 +27,13 @@ if DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql
     # Extract all parts of the URL
     parsed = urllib.parse.urlparse(DATABASE_URL)
     if parsed.scheme in ["postgres", "postgresql"]:
-        # Add query parameters for SSL mode
-        query_params = dict(urllib.parse.parse_qsl(parsed.query))
-        query_params.update({
-            "sslmode": "verify-full",
-            "ssl": "true"
-        })
-        query_string = urllib.parse.urlencode(query_params)
-        
-        # Reconstruct the URL with asyncpg driver and query parameters
+        # Reconstruct the URL with asyncpg driver
         DATABASE_URL = (
             f"postgresql+asyncpg://{parsed.username}:{parsed.password}@"
             f"{parsed.hostname}:{parsed.port}{parsed.path}"
-            f"?{query_string}" if query_string else ""
         )
         try:
-            masked_url = (
-                f"postgresql+asyncpg://****:****@{parsed.hostname}:{parsed.port}{parsed.path}"
-                f"?{query_string}" if query_string else ""
-            )
+            masked_url = f"postgresql+asyncpg://****:****@{parsed.hostname}:{parsed.port}{parsed.path}"
             logger.error(f"Converted Database URL (masked): {masked_url}")
         except Exception as e:
             logger.error(f"Error parsing converted DATABASE_URL: {str(e)}")
@@ -68,7 +56,9 @@ engine_kwargs = {
     "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
-        "ssl": True
+        "server_settings": {
+            "ssl": "true"
+        }
     }
 }
 
