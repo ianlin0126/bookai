@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from app.api import books, analytics, search, llm
+from app.api import books, analytics, search, llm, admin
 from app.db.database import engine, Base
 import time
 import asyncio
@@ -53,10 +53,12 @@ app.include_router(books.router, prefix="/api/books", tags=["books"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 # Ensure static directories exist
-static_dir = Path("static")
-assets_dir = Path("assets")
+base_dir = Path(__file__).resolve().parent.parent
+static_dir = base_dir / "static"
+assets_dir = base_dir / "assets"
 static_dir.mkdir(exist_ok=True)
 assets_dir.mkdir(exist_ok=True)
 

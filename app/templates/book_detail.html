@@ -45,7 +45,7 @@
                         <div id="book-summary-container">
                             <div id="book-summary" class="prose max-w-none"></div>
                             <div id="ai-summarize-container" class="mt-4 hidden text-center py-0">
-                                <p class="text-gray-600 mb-4">Use AI to summarize this book for key takeaways.</p>
+                                <p class="text-gray-600 mb-4">🤖 Use AI to summarize this book for key takeaways.</p>
                                 <button id="ai-summarize-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg inline-flex items-center">
                                     <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="ai-summarize-loading">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Disable button and show loading state
                 button.disabled = true;
                 loadingIcon.classList.remove('hidden');
-                buttonText.textContent = 'Generating...';
+                buttonText.textContent = 'LLM at work...';
                 
                 if (!bookId) {
                     throw new Error('Book ID not available');
