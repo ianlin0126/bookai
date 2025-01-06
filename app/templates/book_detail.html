@@ -1,44 +1,5 @@
 {% extends "base.html" %}
 
-{% block og_tags %}
-<meta property="og:title" content="Book AI Summary">
-<meta property="og:description" content="Your AI-Powered Book Companion">
-<meta property="og:type" content="book">
-<meta property="og:url" content="{{ request.url }}">
-<meta property="og:image" content="{{ request.base_url }}assets/bookai-social.png">
-<script type="text/javascript">
-    // Update OG meta tags when book data is loaded
-    async function updateOGTags(bookId) {
-        try {
-            const response = await fetch(`/api/books/${bookId}`);
-            if (!response.ok) return;
-            
-            const book = await response.json();
-            
-            // Update OG meta tags with book data
-            document.querySelector('meta[property="og:title"]').setAttribute('content', `${book.title} by ${book.author || 'Unknown Author'}`);
-            if (book.summary) {
-                document.querySelector('meta[property="og:description"]').setAttribute('content', book.summary);
-            }
-            if (book.cover_image_url) {
-                document.querySelector('meta[property="og:image"]').setAttribute('content', book.cover_image_url);
-            }
-        } catch (error) {
-            console.error('Error updating OG tags:', error);
-        }
-    }
-
-    // Call updateOGTags when the page loads
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParts = window.location.pathname.split('/');
-        const bookId = urlParts[urlParts.length - 1];
-        if (bookId) {
-            updateOGTags(bookId);
-        }
-    });
-</script>
-{% endblock %}
-
 {% block popular_books %}{% endblock %}
 
 {% block content %}

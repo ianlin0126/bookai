@@ -4,7 +4,6 @@ setup(
     name="bookai",
     version="0.1.0",
     packages=find_packages(),
-    include_package_data=True,
     install_requires=[
         "fastapi==0.104.1",
         "uvicorn==0.24.0",
@@ -20,6 +19,5 @@ setup(
         "pydantic-settings==2.1.0",
         "jinja2==3.1.2",
         "httpx==0.25.2"
-    ],
-    python_requires=">=3.8",
+    ]
 )
