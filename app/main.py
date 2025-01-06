@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from app.api import books, analytics, search, llm
 from app.db.database import engine, Base
 import time
@@ -40,11 +41,11 @@ app.add_middleware(
 async def startup_event():
     await init_db()
 
-# Mount routers without /api prefix
-app.include_router(books.router, prefix="/books", tags=["books"])
-app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
-app.include_router(search.router, prefix="/search", tags=["search"])
-app.include_router(llm.router, prefix="/llm", tags=["llm"])
+# Mount routers with /api prefix
+app.include_router(books.router, prefix="/api/books", tags=["books"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -52,6 +53,14 @@ app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("base.html", {"request": request})
+
+@app.get("/book", response_class=HTMLResponse)
+async def book_detail(request: Request):
+    return templates.TemplateResponse("book_detail.html", {"request": request})
 
 @app.get("/")
 async def home(request: Request):

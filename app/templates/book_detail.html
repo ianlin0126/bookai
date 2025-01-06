@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block popular_books %}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-1 py-8">
+    <div class="bg-white rounded-lg shadow">
+        <!-- Header -->
+        <div class="px-4 py-5 sm:px-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div id="book-title-loading" class="animate-pulse bg-gray-200 h-8 w-64 rounded mb-2"></div>
+                    <div id="book-author-loading" class="animate-pulse bg-gray-200 h-6 w-48 rounded"></div>
+                    <h1 id="book-title" class="text-2xl font-semibold text-gray-900 hidden"></h1>
+                    <p id="book-author" class="mt-1 text-gray-600 hidden"></p>
+                </div>
+                <a href="/" class="text-gray-400 hover:text-gray-500">
+                    <span class="sr-only">Close</span>
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="px-4 sm:px-6 py-0">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Book Cover -->
+                <div class="md:col-span-4">
+                    <div class="flex flex-col space-y-4">
+                        <div id="book-cover" class="aspect-w-2 aspect-h-3 bg-gray-100 rounded-lg overflow-hidden">
+                            <!-- Cover image will be loaded here -->
+                        </div>
+                        <div id="book-button" class="flex justify-center">
+                            <!-- Button will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Book Details -->
+                <div class="md:col-span-8 space-y-6">
+                    <!-- Summary Section -->
+                    <div class="mb-8">
+                        <div id="book-summary-container">
+                            <div id="book-summary" class="prose max-w-none"></div>
+                            <div id="ai-summarize-container" class="mt-4 hidden text-center py-0">
+                                <p class="text-gray-600 mb-4">Use AI to summarize this book for key takeaways.</p>
+                                <button id="ai-summarize-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg inline-flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="ai-summarize-loading">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span id="ai-summarize-text">AI Summarize</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Q&A Section -->
+                    <div id="qa-section" class="hidden">
+                        <h3 class="text-xl font-semibold mb-4">AI Questions & Answers</h3>
+                        <div id="book-qa" class="space-y-4">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    let bookId = urlParams.get('id');
+    const openLibraryKey = urlParams.get('key');
+    
+    async function showBookDetails() {
+        try {
+            let book;
+            
+            if (bookId) {
+                // Fetch existing book
+                const response = await fetch(`/api/books/${bookId}`);
+                if (!response.ok) throw new Error('Failed to fetch book');
+                book = await response.json();
+            } else if (openLibraryKey) {
+                // Create/get book from Open Library
+                const response = await fetch(`/api/books/open_library/${openLibraryKey}`, {
+                    method: 'POST'
+                });
+                if (!response.ok) throw new Error('Failed to create/get book');
+                book = await response.json();
+                // Store the book ID for later use
+                bookId = book.id;
+            } else {
+                throw new Error('No book ID or Open Library key provided');
+            }
+
+            // Record the visit if we have a book ID
+            if (book.id) {
+                recordVisit(book.id).catch(console.error);
+            }
+
+            // Update book details
+            const titleEl = document.getElementById('book-title');
+            const authorEl = document.getElementById('book-author');
+            const titleLoadingEl = document.getElementById('book-title-loading');
+            const authorLoadingEl = document.getElementById('book-author-loading');
+            
+            // Update content
+            titleEl.textContent = book.title;
+            authorEl.textContent = book.author || 'Unknown Author';
+            
+            // Show content, hide loading
+            titleLoadingEl.classList.add('hidden');
+            authorLoadingEl.classList.add('hidden');
+            titleEl.classList.remove('hidden');
+            authorEl.classList.remove('hidden');
+            
+            // Update cover image
+            if (book.cover_image_url) {
+                document.getElementById('book-cover').innerHTML = `
+                    <img src="${book.cover_image_url}" 
+                         alt="${book.title}" 
+                         class="w-full h-full object-contain">`;
+            } else {
+                document.getElementById('book-cover').innerHTML = `
+                    <div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
+                        No cover available
+                    </div>`;
+            }
+            
+            // Update Amazon button if affiliate link exists
+            if (book.affiliate_links && book.affiliate_links.amazon) {
+                document.getElementById('book-button').innerHTML = `
+                    <a href="${book.affiliate_links.amazon}" 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <img src="/assets/amazon-logo.png" alt="Buy on Amazon" class="h-6">
+                    </a>`;
+            }
+            
+            // Update summary section and Q&A visibility
+            const summaryContainer = document.getElementById('book-summary');
+            const aiSummarizeContainer = document.getElementById('ai-summarize-container');
+            const qaSection = document.getElementById('qa-section');
+            
+            if (book.summary) {
+                summaryContainer.innerHTML = `<h3 class="text-xl font-semibold mb-4">AI Summary</h3><p class="text-gray-700">${book.summary}</p>`;
+                aiSummarizeContainer.classList.add('hidden');
+                qaSection.classList.remove('hidden');
+                
+                // Update Q&A
+                let qa = [];
+                try {
+                    if (book.questions_and_answers) {
+                        qa = JSON.parse(book.questions_and_answers);
+                    }
+                } catch (e) {
+                    console.error('Error parsing Q&A:', e);
+                }
+                
+                if (qa && qa.length > 0) {
+                    document.getElementById('book-qa').innerHTML = qa.map((qa, index) => `
+                        <div class="border rounded p-3">
+                            <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${qa.question}</h5>
+                            <p class="text-gray-600">${qa.answer}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('book-qa').innerHTML = '<p class="text-gray-500">No Q&A available.</p>';
+                }
+            } else {
+                summaryContainer.innerHTML = '';
+                aiSummarizeContainer.classList.remove('hidden');
+                qaSection.classList.add('hidden');
+            }
+            
+        } catch (error) {
+            console.error('Error loading book:', error);
+            document.getElementById('book-title').textContent = 'Error';
+            document.getElementById('book-author').textContent = '';
+            document.getElementById('book-summary').innerHTML = `
+                <div class="text-red-600">
+                    Failed to load book details: ${error.message}
+                </div>`;
+            document.getElementById('book-qa').innerHTML = '';
+        }
+        
+        // Add click handler for AI Summarize button
+        document.getElementById('ai-summarize-btn').addEventListener('click', async () => {
+            const button = document.getElementById('ai-summarize-btn');
+            const loadingIcon = document.getElementById('ai-summarize-loading');
+            const buttonText = document.getElementById('ai-summarize-text');
+            
+            try {
+                // Disable button and show loading state
+                button.disabled = true;
+                loadingIcon.classList.remove('hidden');
+                buttonText.textContent = 'Generating...';
+                
+                if (!bookId) {
+                    throw new Error('Book ID not available');
+                }
+                
+                // Call refresh_book_digest endpoint
+                const response = await fetch(`/api/llm/books/${bookId}/refresh`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to generate summary');
+                }
+                
+                const updatedBook = await response.json();
+                
+                // Update the summary section
+                document.getElementById('book-summary').innerHTML = `<h3 class="text-xl font-semibold mb-4">AI Summary</h3><p class="text-gray-700">${updatedBook.summary}</p>`;
+                
+                // Update Q&A section if available
+                if (updatedBook.questions_and_answers) {
+                    let qa = JSON.parse(updatedBook.questions_and_answers);
+                    if (qa && qa.length > 0) {
+                        document.getElementById('book-qa').innerHTML = qa.map((qa, index) => `
+                            <div class="border rounded p-3">
+                                <h5 class="font-medium text-gray-900 mb-2">Q${index + 1}: ${qa.question}</h5>
+                                <p class="text-gray-600">${qa.answer}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+                
+                // Hide the AI Summarize button container
+                document.getElementById('ai-summarize-container').classList.add('hidden');
+                document.getElementById('qa-section').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                buttonText.textContent = 'Failed - Try Again';
+            } finally {
+                // Reset button state
+                button.disabled = false;
+                loadingIcon.classList.add('hidden');
+            }
+        });
+    }
+    
+    showBookDetails();
+});
+</script>
+{% endblock %}

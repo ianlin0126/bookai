@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block popular_books %}{% endblock %}
+
 {% macro book_card(book, onclick) %}
 <div class="book-card bg-white rounded shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200 w-[180px]" 
      onclick="{{ onclick }}">

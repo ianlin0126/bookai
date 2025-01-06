@@ -38,9 +38,6 @@ async def get_book(
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
         
-        # Record the visit
-        await analytics_service.record_visit(db, book_id)
-        
         return schemas.BookResponse(
             id=book.id,
             title=book.title,
