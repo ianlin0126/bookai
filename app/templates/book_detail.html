@@ -14,7 +14,7 @@
                     <h1 id="book-title" class="text-2xl font-semibold text-gray-900 hidden"></h1>
                     <p id="book-author" class="mt-1 text-gray-600 hidden"></p>
                 </div>
-                <a href="/" class="text-gray-400 hover:text-gray-500">
+                <a href="javascript:void(0)" onclick="history.back()" class="text-gray-400 hover:text-gray-500">
                     <span class="sr-only">Close</span>
                     <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -132,13 +132,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             // Update Amazon button if affiliate link exists
-            if (book.affiliate_links && book.affiliate_links.amazon) {
+            if (book.affiliate_links) {
                 document.getElementById('book-button').innerHTML = `
-                    <a href="${book.affiliate_links.amazon}" 
-                       target="_blank" 
-                       rel="noopener noreferrer" 
-                       class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <img src="/assets/amazon-logo.png" alt="Buy on Amazon" class="h-6">
+                    <a href="${book.affiliate_links}" target="_blank" rel="noopener noreferrer">
+                        <img src="/assets/buy-on-amazon-button-png-3-300x111.png" alt="Buy on Amazon" style="width: 60%; display: block; margin: 0 auto;">
                     </a>`;
             }
             

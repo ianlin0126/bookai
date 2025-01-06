@@ -371,11 +371,11 @@ async function showBookDetails(bookId) {
         // Update Amazon button if affiliate link exists
         if (book.affiliate_links && book.affiliate_links.amazon) {
             document.getElementById('book-button').innerHTML = `
-                <a href="${book.affiliate_links.amazon}" 
+                <a href="${book.affiliate_links}" 
                    target="_blank" 
                    rel="noopener noreferrer" 
                    class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <img src="/assets/amazon-logo.png" alt="Buy on Amazon" class="h-6">
+                    <img src="/assets/buy-on-amazon-button-png-3-300x111.png" alt="Buy on Amazon" class="h-6">
                 </a>`;
         }
         
