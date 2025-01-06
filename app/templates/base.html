@@ -38,11 +38,16 @@
                 </div>
                 <div class="flex-1 flex items-center justify-center px-8 max-w-3xl mx-auto">
                     <div class="w-full relative">
-                        <input type="text" 
-                               id="search-input"
-                               class="w-full p-3 pl-4 pr-12 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                               placeholder="Search by book title or author...">
-                        <div id="search-results" class="absolute z-50 w-full bg-white mt-1 rounded-lg shadow-lg hidden"></div>
+                        <div class="relative flex items-center">
+                            <div class="absolute left-4 flex items-center pointer-events-none">
+                                <img src="/assets/search-svgrepo-com.svg" alt="Search" class="w-5 h-5 text-gray-400">
+                            </div>
+                            <input type="text" 
+                                   id="search-input"
+                                   class="w-full py-3 pl-12 pr-4 text-base border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
+                                   placeholder="Search by book title or author...">
+                        </div>
+                        <div id="search-results" class="absolute z-50 w-full bg-white mt-2 rounded-2xl shadow-lg hidden overflow-hidden border border-gray-200"></div>
                     </div>
                 </div>
                 <div class="flex items-center flex-shrink-0 w-40">
@@ -56,18 +61,18 @@
 
     <!-- Book Detail Modal -->
     <div id="book-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-2 sm:px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                <!-- Header -->
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 id="modal-title" class="text-2xl font-semibold text-gray-900"></h3>
+            <div class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full max-w-[95vw] sm:max-w-4xl">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <!-- Header -->
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left flex-grow">
+                            <h3 id="modal-title" class="text-xl leading-6 font-semibold text-gray-900"></h3>
                             <p id="modal-author" class="mt-1 text-gray-600"></p>
                         </div>
-                        <div class="flex items-center space-x-4">
+                        <div class="ml-3 flex items-center">
                             <button id="refresh-button" 
                                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                 AI Summarize
@@ -82,9 +87,9 @@
                     </div>
                     
                     <!-- Content -->
-                    <div id="modal-content" class="mt-6 grid grid-cols-12 gap-6">
+                    <div id="modal-content" class="mt-6 grid grid-cols-1 md:grid-cols-12 gap-6">
                         <!-- Book Cover -->
-                        <div class="col-span-4">
+                        <div class="col-span-1 md:col-span-4">
                             <div class="flex flex-col space-y-4">
                                 <div id="book-cover" class="aspect-w-2 aspect-h-3 bg-gray-100 rounded-lg overflow-hidden">
                                     <!-- Cover image will be loaded here -->
@@ -96,7 +101,7 @@
                         </div>
                         
                         <!-- Book Details -->
-                        <div class="col-span-8 space-y-6">
+                        <div class="col-span-1 md:col-span-8 space-y-6">
                             <!-- Summary Section -->
                             <div>
                                 <h4 class="text-lg font-semibold text-gray-900 mb-2">Summary</h4>
