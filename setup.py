@@ -20,6 +20,13 @@ setup(
         "jinja2==3.1.2",
         "httpx==0.25.2",
         "aiosqlite==0.19.0",
-        "greenlet==3.0.1"
+        "greenlet==3.0.1",
+        "thefuzz==0.20.0",
+        "python-Levenshtein==0.23.0",
+        "pydantic==2.5.2",
+        "typing-extensions==4.8.0",
+        "asyncio==3.4.3",
+        "aiohttp==3.9.1",
+        "pathlib==1.0.1"
     ]
 )
