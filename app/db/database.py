@@ -23,21 +23,27 @@ if debug_url:
         logger.error(f"Error parsing DATABASE_URL: {str(e)}")
 
 # Convert URL format if needed (for Railway)
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-    try:
-        parsed = urllib.parse.urlparse(DATABASE_URL)
-        masked_url = f"{parsed.scheme}://****:****@{parsed.hostname}:{parsed.port}/{parsed.path.lstrip('/')}"
-        logger.error(f"Converted Database URL (masked): {masked_url}")
-    except Exception as e:
-        logger.error(f"Error parsing converted DATABASE_URL: {str(e)}")
+if DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://"):
+    # Extract all parts of the URL
+    parsed = urllib.parse.urlparse(DATABASE_URL)
+    if parsed.scheme in ["postgres", "postgresql"]:
+        # Reconstruct the URL with asyncpg driver
+        DATABASE_URL = (
+            f"postgresql+asyncpg://{parsed.username}:{parsed.password}@"
+            f"{parsed.hostname}:{parsed.port}{parsed.path}"
+        )
+        try:
+            masked_url = f"postgresql+asyncpg://****:****@{parsed.hostname}:{parsed.port}{parsed.path}"
+            logger.error(f"Converted Database URL (masked): {masked_url}")
+        except Exception as e:
+            logger.error(f"Error parsing converted DATABASE_URL: {str(e)}")
 
 # Ensure we're using the asyncpg driver
 if "sqlite" in DATABASE_URL:
     raise ValueError(f"SQLite is not supported. Please use PostgreSQL with asyncpg driver. Current URL type: {DATABASE_URL.split('://')[0]}")
 
-if "postgresql" not in DATABASE_URL:
-    raise ValueError(f"Only PostgreSQL is supported. Please check your DATABASE_URL. Current URL type: {DATABASE_URL.split('://')[0]}")
+if "postgresql+asyncpg" not in DATABASE_URL:
+    raise ValueError(f"Only PostgreSQL with asyncpg is supported. Please check your DATABASE_URL. Current URL type: {DATABASE_URL.split('://')[0]}")
 
 logger.info(f"Using database URL: {masked_url}")
 
