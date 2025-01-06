@@ -7,11 +7,18 @@ from app.api import books, analytics, search, llm
 from app.db.database import engine, Base
 import time
 import asyncio
+import os
+from pathlib import Path
 
 # Create database tables
 async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[INFO] Database initialized successfully")
+    except Exception as e:
+        print(f"[ERROR] Database initialization failed: {str(e)}")
+        # Don't raise the error, allow the app to start without DB
 
 app = FastAPI(title="BookDigest.ai")
 
@@ -47,21 +54,32 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"]
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
 
+# Ensure static directories exist
+static_dir = Path("static")
+assets_dir = Path("assets")
+static_dir.mkdir(exist_ok=True)
+assets_dir.mkdir(exist_ok=True)
+
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("base.html", {"request": request})
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 @app.get("/book", response_class=HTMLResponse)
 async def book_detail(request: Request):
     return templates.TemplateResponse("book_detail.html", {"request": request})
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        print(f"[ERROR] Template rendering failed: {str(e)}")
+        return HTMLResponse(content="<html><body><h1>BookAI</h1><p>Service is starting up...</p></body></html>")
