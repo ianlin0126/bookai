@@ -22,7 +22,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
     url = settings.DATABASE_URL
+    if url.startswith('postgresql://'):
+        url = url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -40,8 +44,14 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 async def run_async_migrations() -> None:
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    """In this scenario we need to create an Engine
+    and associate a connection with the context."""
+
+    configuration = config.get_section(config.config_ini_section, {})
+    url = settings.DATABASE_URL
+    if url.startswith('postgresql://'):
+        url = url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+    configuration["sqlalchemy.url"] = url
 
     connectable = async_engine_from_config(
         configuration,
@@ -55,6 +65,7 @@ async def run_async_migrations() -> None:
     await connectable.dispose()
 
 def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
     asyncio.run(run_async_migrations())
 
 if context.is_offline_mode():
