@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from app.db.database import engine, Base
 from app.api import books, analytics, admin, search, llm
 import os
@@ -17,12 +16,11 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BookDigest.ai")
 
-# Add security middlewares
+# Add security middlewares in production
 if os.getenv('ENVIRONMENT') == 'production':
-    app.add_middleware(HTTPSRedirectMiddleware)
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["bookai-production.up.railway.app"]
+        allowed_hosts=["bookai-production.up.railway.app", "*.railway.app"]
     )
 
 # Add CORS middleware
