@@ -8,8 +8,9 @@ import ssl
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)  # Ensure we see the logs
 
-# Get database URL from environment
+# Get database URL and environment from environment variables
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/bookai")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 # Debug log to see what URL we're getting (mask sensitive parts)
 debug_url = DATABASE_URL
@@ -18,7 +19,7 @@ if debug_url:
     try:
         parsed = urllib.parse.urlparse(debug_url)
         masked_url = f"{parsed.scheme}://****:****@{parsed.hostname}:{parsed.port}{parsed.path}"
-        logger.error(f"Initial Database URL (masked): {masked_url}")
+        logger.info(f"Initial Database URL (masked): {masked_url}")
     except Exception as e:
         logger.error(f"Error parsing DATABASE_URL: {str(e)}")
 
@@ -34,7 +35,7 @@ if DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql
         )
         try:
             masked_url = f"postgresql+asyncpg://****:****@{parsed.hostname}:{parsed.port}{parsed.path}"
-            logger.error(f"Converted Database URL (masked): {masked_url}")
+            logger.info(f"Converted Database URL (masked): {masked_url}")
         except Exception as e:
             logger.error(f"Error parsing converted DATABASE_URL: {str(e)}")
 
@@ -47,12 +48,7 @@ if "postgresql+asyncpg" not in DATABASE_URL:
 
 logger.info(f"Using database URL: {masked_url}")
 
-# Create SSL context for Railway
-ssl_context = ssl.create_default_context()
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
-
-# Create engine with appropriate settings
+# Configure SSL context based on environment
 engine_kwargs = {
     "echo": True,
     "pool_size": 20,
@@ -60,13 +56,22 @@ engine_kwargs = {
     "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
-        "ssl": ssl_context
     }
 }
 
+# Only use SSL in production
+if ENVIRONMENT == "production":
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    engine_kwargs["connect_args"]["ssl"] = ssl_context
+else:
+    # Disable SSL for local development
+    engine_kwargs["connect_args"]["ssl"] = False
+
 try:
     engine = create_async_engine(DATABASE_URL, **engine_kwargs)
-    logger.info("Successfully created database engine")
+    logger.info(f"Successfully created database engine (Environment: {ENVIRONMENT})")
 except Exception as e:
     logger.error(f"Error creating database engine: {str(e)}")
     raise
