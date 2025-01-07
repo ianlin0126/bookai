@@ -181,7 +181,7 @@ async function handleSearchInput(event) {
                     <div class="flex items-center">
                         ${book.cover_image_url ? 
                             `<img src="${book.cover_image_url}" alt="${book.title}" class="w-10 h-14 object-cover rounded mr-3">` :
-                            `<div class="w-10 h-14 bg-gray-200 rounded mr-3 flex items-center justify-center text-gray-400 text-xs">No cover</div>`
+                            `<div class="w-10 h-14 bg-gray-200 rounded mr-3 flex items-center justify-center text-center text-gray-400 text-xs"></div>`
                         }
                         <div>
                             <div class="font-medium text-gray-900">${book.title}</div>
