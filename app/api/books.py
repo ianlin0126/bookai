@@ -88,7 +88,7 @@ async def search_book_by_open_library_key(open_library_key: str):
             cover_id = None
             if book_data.get('covers'):
                 cover_id = book_data['covers'][0]
-            cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+            cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id and cover_id > 0 else None
             
             # Return book data
             return {

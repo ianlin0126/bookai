@@ -130,7 +130,7 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
                 
                 # Get cover image URL if available
                 cover_id = doc.get('cover_i')
-                cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+                cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id and cover_id > 0 else None
                 
                 result = {
                     'title': doc['title'],

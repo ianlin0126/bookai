@@ -244,7 +244,7 @@ async def post_book_by_open_library_key(
         cover_id = None
         if data.get('covers'):
             cover_id = data['covers'][0]
-        cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+        cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id and cover_id > 0 else None
         
         # Create book with data from Open Library
         try:
