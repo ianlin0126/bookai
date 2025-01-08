@@ -67,15 +67,6 @@ function createBookCard(book, onclick) {
 if (searchInput && searchResults) {
     searchInput.addEventListener('keydown', handleSearchKeydown);
     searchInput.addEventListener('input', handleSearchInput);
-    searchInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            const query = searchInput.value.trim();
-            if (query) {
-                window.location.href = `/api/search/books/view?q=${encodeURIComponent(query)}`;
-            }
-        }
-    });
     searchInput.addEventListener('focus', () => {
         if (searchResults.children.length > 0) {
             searchResults.classList.remove('hidden');

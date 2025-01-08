@@ -60,6 +60,7 @@
                                    class="w-full py-3 pl-12 pr-10 text-base border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
                                    placeholder="Search book title, author, or both"
                                    value="{{ query if query else '' }}"
+                                   autocomplete="off"
                                    onfocus="if(window.innerWidth < 640) document.getElementById('logo').classList.add('hidden')"
                                    onblur="if(window.innerWidth < 640 && document.getElementById('search-results').classList.contains('hidden')) document.getElementById('logo').classList.remove('hidden')"
                                    oninput="document.getElementById('search-clear').style.display = this.value ? 'flex' : 'none'">
