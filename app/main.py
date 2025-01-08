@@ -20,7 +20,12 @@ app = FastAPI(title="BookDigest.ai")
 if os.getenv('ENVIRONMENT') == 'production':
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["bookai-production.up.railway.app", "*.railway.app"]
+        allowed_hosts=[
+            "bookai-production.up.railway.app",
+            "*.railway.app",
+            "booksai.xyz",
+            "www.booksai.xyz"
+        ]
     )
 
 # Add CORS middleware
