@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_, func, case
 from sqlalchemy import select
 from app.db import models, schemas
+import asyncio
+from app.services.image_cache_service import image_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 10) -> List[schemas.TypeaheadSuggestion]:
     """Get typeahead suggestions for search by matching book titles and author names.
@@ -65,21 +70,28 @@ async def get_typeahead_suggestions(db: AsyncSession, query: str, limit: int = 1
             id=book.id,
             title=book.title,
             author=author.name if author else None,
-            cover_image_url=convert_to_small_cover(book.cover_image_url)
+            cover_image_url=await convert_to_small_cover(book.cover_image_url)
         ))
     
     return suggestions
 
-def convert_to_small_cover(url: Optional[str]) -> Optional[str]:
+async def convert_to_small_cover(url: Optional[str]) -> Optional[str]:
     """Convert an OpenLibrary cover URL to use the small (-S) size."""
     if not url:
         return None
     return re.sub(r'-[LM]\.jpg$', '-S.jpg', url)
 
+async def _cache_cover_image(cover_url: str) -> None:
+    """Cache a cover image in the background without blocking."""
+    try:
+        await image_cache.ensure_cached(cover_url)
+    except Exception as e:
+        logger.error(f"Error caching cover image {cover_url}: {str(e)}")
+
 async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: int = 12) -> List[Dict[str, Any]]:
     """Search for books using Open Library API."""
     try:
-        print("[DEBUG] Searching Open Library with query:", query)
+        logger.info(f"[DEBUG] Searching Open Library with query: {query}")
         
         # Calculate offset
         offset = (page - 1) * per_page
@@ -92,8 +104,8 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
             'fields': 'key,title,author_name,author_key,cover_i,first_publish_year'
         }
         
-        print("[DEBUG] Search parameters:", params)
-        print("[DEBUG] Making request to: https://openlibrary.org/search.json")
+        logger.info(f"[DEBUG] Search parameters: {params}")
+        logger.info("[DEBUG] Making request to: https://openlibrary.org/search.json")
         
         client = httpx.AsyncClient()
         try:
@@ -105,20 +117,21 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
             )
             
             if response.status_code != 200:
-                print(f"[DEBUG] Request error searching Open Library: {response.text}")
-                print("[DEBUG] Response status:", response.status_code)
+                logger.error(f"[DEBUG] Request error searching Open Library: {response.text}")
+                logger.error(f"[DEBUG] Response status: {response.status_code}")
                 return []
                 
             data = response.json()
             end_time = time.time()
-            print(f"[DEBUG] Open Library API response time: {end_time - start_time:.2f} seconds")
+            logger.info(f"[DEBUG] Open Library API response time: {end_time - start_time:.2f} seconds")
             
             if not data.get('docs'):
-                print("[DEBUG] No results found")
+                logger.info("[DEBUG] No results found")
                 return []
             
             # Process results
             results = []
+            
             for doc in data['docs']:
                 # Skip if missing required fields
                 if not doc.get('key') or not doc.get('title'):
@@ -131,6 +144,10 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
                 # Get cover image URL if available
                 cover_id = doc.get('cover_i')
                 cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id and cover_id > 0 else None
+                
+                # Get cached URL if available
+                if cover_url:
+                    cover_url = await image_cache.get_cached_url(cover_url)
                 
                 result = {
                     'title': doc['title'],
@@ -148,5 +165,5 @@ async def search_books(db: AsyncSession, query: str, page: int = 1, per_page: in
             await client.aclose()
             
     except Exception as e:
-        print(f"[DEBUG] Error searching Open Library: {str(e)}")
+        logger.error(f"[DEBUG] Error searching Open Library: {str(e)}")
         return []

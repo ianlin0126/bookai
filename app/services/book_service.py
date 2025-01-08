@@ -10,6 +10,18 @@ from app.db import models, schemas
 from app.services import llm_service
 from app.core.utils import clean_json_string, validate_book_metadata, create_amazon_affiliate_link
 from app.api.llm import generate_book_digest_prompt
+from app.services.image_cache_service import image_cache
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def _process_book_for_response(book: models.Book) -> models.Book:
+    """Process a book for API response, including cached image URL."""
+    original_url = book.cover_image_url
+    if original_url:
+        cached_url = await image_cache.get_cached_url(original_url)
+        book.cover_image_url = cached_url
+    return book
 
 async def get_book(db: AsyncSession, book_id: int) -> models.Book:
     """Get a book by ID."""
@@ -22,7 +34,7 @@ async def get_book(db: AsyncSession, book_id: int) -> models.Book:
     book = result.scalar_one_or_none()
     if not book:
         raise ValueError(f"Book with id {book_id} not found")
-    return book
+    return await _process_book_for_response(book)
 
 async def create_book_with_author(
     db: AsyncSession,
@@ -71,7 +83,7 @@ async def create_book_with_author(
     await db.commit()
     await db.refresh(book)
     
-    return book
+    return await _process_book_for_response(book)
 
 async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "gemini") -> models.Book:
     """Update a book's AI-generated content using the specified LLM provider."""
@@ -125,7 +137,7 @@ async def refresh_book_digest(db: AsyncSession, book_id: int, provider: str = "g
         
         # Refresh one final time to ensure we have the latest data
         await db.refresh(book)
-        return book
+        return await _process_book_for_response(book)
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {str(e)}, Response: {cleaned_response}")  # Debug log
         raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
@@ -157,7 +169,7 @@ async def create_book(db: AsyncSession, book: schemas.BookCreate) -> models.Book
     db.add(db_book)
     await db.commit()
     await db.refresh(db_book)
-    return db_book
+    return await _process_book_for_response(db_book)
 
 async def update_book(db: AsyncSession, book_id: int, book_update: schemas.BookCreate) -> models.Book:
     """Update a book's details."""
@@ -166,7 +178,7 @@ async def update_book(db: AsyncSession, book_id: int, book_update: schemas.BookC
         setattr(db_book, key, value)
     await db.commit()
     await db.refresh(db_book)
-    return db_book
+    return await _process_book_for_response(db_book)
 
 async def get_book_by_open_library_key(
     db: AsyncSession,
@@ -189,7 +201,7 @@ async def get_book_by_open_library_key(
     
     if book:
         print(f"[DEBUG] Found existing book: {book.title}")
-        return book
+        return await _process_book_for_response(book)
     else:
         print(f"[DEBUG] No book found with key: {open_library_key}")
         return None

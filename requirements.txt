@@ -24,3 +24,6 @@ aiohttp==3.9.1
 pathlib==1.0.1
 asyncpg==0.28.0  # Updated version
 psycopg2-binary==2.9.7  # Updated version
+aiofiles==23.2.1  # For async file operations
+Pillow==10.1.0  # For image processing
+aiopath==0.6.11  # For async path operations

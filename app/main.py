@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.db.database import engine, Base
-from app.api import books, analytics, admin, search, llm
+from app.api import books, analytics, admin, search, llm, images
 import os
 from pathlib import Path
 import logging
@@ -84,21 +84,26 @@ async def rewrite_static_urls(request: Request, call_next):
 base_dir = Path(__file__).resolve().parent.parent
 static_dir = base_dir / "static"
 js_dir = static_dir / "js"
+css_dir = static_dir / "css"
+cache_dir = static_dir / "cache"
+cache_images_dir = cache_dir / "images"
 
 # Create directories if they don't exist
-os.makedirs(static_dir, exist_ok=True)
-os.makedirs(js_dir, exist_ok=True)
+for directory in [static_dir, js_dir, css_dir, cache_dir, cache_images_dir]:
+    directory.mkdir(parents=True, exist_ok=True)
 
 try:
-    # Mount static directory with custom HTML handler
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    logger.info(f"Successfully mounted static directory at {static_dir}")
+    # Mount static directories
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.mount("/js", StaticFiles(directory=js_dir), name="js")
+    app.mount("/css", StaticFiles(directory=css_dir), name="css")
+    app.mount("/cache", StaticFiles(directory=cache_dir), name="cache")
+    
+    # Configure templates
+    templates = Jinja2Templates(directory=str(base_dir / "app" / "templates"))
 except Exception as e:
-    logger.error(f"Failed to mount static directory: {str(e)}")
+    logger.error(f"Error mounting static directories: {str(e)}")
     raise
-
-# Configure templates with custom error handling
-templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -152,3 +157,4 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"]
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(images.router, prefix="/api/images", tags=["images"])
