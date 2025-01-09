@@ -289,24 +289,28 @@ async def refresh_book_cover(db: AsyncSession, book_id: int) -> models.Book:
         raise ValueError(f"Book {book_id} has no OpenLibrary key")
         
     try:
-        # Get book details from OpenLibrary
-        work_url = f"https://openlibrary.org/works/{book.open_library_key}.json"
-        logger.info(f"Fetching book details from {work_url}")
+        # Search OpenLibrary by title to get cover_i
+        search_url = f"https://openlibrary.org/search.json?q={book.title}"
+        logger.info(f"Searching OpenLibrary: {search_url}")
         
         async with httpx.AsyncClient() as client:
-            response = await client.get(work_url)
+            response = await client.get(search_url)
             if response.status_code != 200:
-                raise ValueError(f"Failed to fetch book details: {response.status_code}")
+                raise ValueError(f"Failed to search OpenLibrary: {response.status_code}")
                 
             data = response.json()
-            
-            # Get cover ID from response
-            covers = data.get('covers', [])
-            if not covers:
-                raise ValueError("No covers found for book")
+            if not data.get('docs'):
+                raise ValueError(f"No search results found for book '{book.title}'")
                 
-            cover_id = covers[0]  # Use first cover
-            cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            # Get cover_i from first result
+            first_result = data['docs'][0]
+            cover_i = first_result.get('cover_i')
+            if not cover_i:
+                raise ValueError(f"No cover found for book '{book.title}'")
+                
+            # Construct cover URL
+            cover_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+            logger.info(f"Found cover URL: {cover_url}")
             
             # Cache the new image
             cached_url = await image_cache.get_cached_url(cover_url)
@@ -317,7 +321,6 @@ async def refresh_book_cover(db: AsyncSession, book_id: int) -> models.Book:
             book.cover_image_url = cached_url
             await db.commit()
             
-            logger.info(f"Successfully refreshed cover for book {book_id}")
             return await _process_book_for_response(book)
             
     except Exception as e:
