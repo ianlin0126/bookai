@@ -38,6 +38,10 @@ class ImageCache:
         url_hash = hashlib.md5(url.encode()).hexdigest()
         return self.cache_dir / f"{url_hash}.jpg"
 
+    def _get_openlibrary_url(self, book_key: str) -> str:
+        """Generate OpenLibrary URL from book key"""
+        return f"https://covers.openlibrary.org/b/id/{book_key}-L.jpg"
+
     async def get_cached_image_path(self, url: str) -> Optional[str]:
         """
         Get the path to a cached image. If the image isn't cached, return None.
@@ -53,6 +57,20 @@ class ImageCache:
         Ensure an image is in the cache, downloading it if necessary.
         Returns the path to the cached image, or None if caching failed.
         """
+        if not url:
+            return None
+            
+        # If it's a cached URL, extract the book key and get the OpenLibrary URL
+        if url.startswith('/cache/images/'):
+            # Try to extract book key from URL pattern in database
+            try:
+                filename = Path(url).name
+                book_key = filename.split('.')[0]  # Remove .jpg
+                url = self._get_openlibrary_url(book_key)
+            except Exception as e:
+                logger.error(f"Failed to extract book key from cached URL {url}: {str(e)}")
+                return None
+                
         cache_path = self._get_cache_path(url)
         
         # Return cached path if exists
@@ -89,36 +107,24 @@ class ImageCache:
             logger.error(f"Error caching image from {url}: {str(e)}")
             return None
 
-    async def get_or_download(self, url: str) -> Optional[str]:
-        """
-        Get a cached image path, downloading it if necessary.
-        Returns the path to the cached image, or None if unavailable.
-        """
-        return await self.ensure_cached(url)
-
     async def get_cached_url(self, original_url: str, cache_if_missing: bool = True) -> str:
         """
         Get the URL for a cached image. If the image isn't cached and cache_if_missing is True,
-        it will be cached in the background. Returns the cached URL if available, otherwise
-        returns the original URL.
+        it will be cached. Returns the cached URL if available, otherwise returns the original URL.
         """
         if not original_url:
             return ""
             
-        # If URL is already in cached format, return as is
+        # If URL is already in cached format, check if file exists
         if original_url.startswith('/cache/images/'):
             logger.info(f"URL already in cache format: {original_url}")
-            # Check if the file actually exists
             cache_path = self.cache_dir / Path(original_url).name
             if not cache_path.exists():
                 logger.warning(f"Cache file does not exist: {cache_path}")
-                # Extract original URL from database and try to cache it
-                try:
-                    # Start caching in background
-                    logger.info(f"Starting background caching for missing file: {original_url}")
-                    asyncio.create_task(self.ensure_cached(original_url))
-                except Exception as e:
-                    logger.error(f"Error starting cache task: {str(e)}")
+                # Try to re-cache from OpenLibrary
+                cached_path = await self.ensure_cached(original_url)
+                if cached_path:
+                    return f"/cache/images/{Path(cached_path).name}"
             return original_url
             
         try:
@@ -135,7 +141,7 @@ class ImageCache:
             
             # If not cached and we should cache it
             if cache_if_missing and not original_url.startswith('/cache/'):
-                # Start caching immediately instead of in background
+                # Start caching immediately
                 logger.info(f"Starting immediate caching for: {original_url}")
                 cached_path = await self.ensure_cached(original_url)
                 if cached_path:
