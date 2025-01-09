@@ -12,6 +12,7 @@ from app.core.utils import clean_json_string, validate_book_metadata, create_ama
 from app.api.llm import generate_book_digest_prompt
 from app.services.image_cache_service import image_cache
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -273,3 +274,88 @@ async def post_book_by_open_library_key(
         except Exception as e:
             print(f"[DEBUG] Error creating book: {str(e)}")
             raise
+
+async def refresh_book_cover(db: AsyncSession, book_id: int) -> models.Book:
+    """Refresh a book's cover image by re-fetching from OpenLibrary."""
+    # Get the book
+    result = await db.execute(
+        select(models.Book).where(models.Book.id == book_id)
+    )
+    book = result.scalar_one_or_none()
+    if not book:
+        raise ValueError(f"Book with id {book_id} not found")
+        
+    if not book.open_library_key:
+        raise ValueError(f"Book {book_id} has no OpenLibrary key")
+        
+    try:
+        # Get book details from OpenLibrary
+        work_url = f"https://openlibrary.org/works/{book.open_library_key}.json"
+        logger.info(f"Fetching book details from {work_url}")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(work_url)
+            if response.status_code != 200:
+                raise ValueError(f"Failed to fetch book details: {response.status_code}")
+                
+            data = response.json()
+            
+            # Get cover ID from response
+            covers = data.get('covers', [])
+            if not covers:
+                raise ValueError("No covers found for book")
+                
+            cover_id = covers[0]  # Use first cover
+            cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            
+            # Cache the new image
+            cached_url = await image_cache.get_cached_url(cover_url)
+            if not cached_url or cached_url == cover_url:
+                raise ValueError(f"Failed to cache image from {cover_url}")
+                
+            # Update book's cover URL
+            book.cover_image_url = cached_url
+            await db.commit()
+            
+            logger.info(f"Successfully refreshed cover for book {book_id}")
+            return await _process_book_for_response(book)
+            
+    except Exception as e:
+        logger.error(f"Error refreshing cover for book {book_id}: {str(e)}")
+        raise ValueError(f"Failed to refresh book cover: {str(e)}")
+
+async def refresh_all_book_covers(db: AsyncSession) -> Dict[str, Any]:
+    """Refresh cover images for all books with OpenLibrary keys."""
+    # Get all books with OpenLibrary keys
+    result = await db.execute(
+        select(models.Book)
+        .where(models.Book.open_library_key.isnot(None))
+    )
+    books = result.scalars().all()
+    
+    total = len(books)
+    success = 0
+    failed = 0
+    errors = []
+    
+    # Process each book
+    for book in books:
+        try:
+            await refresh_book_cover(db, book.id)
+            success += 1
+            logger.info(f"Successfully refreshed cover for book {book.id}")
+        except Exception as e:
+            failed += 1
+            error_msg = f"Failed to refresh cover for book {book.id}: {str(e)}"
+            errors.append(error_msg)
+            logger.error(error_msg)
+            
+        # Sleep briefly to avoid overwhelming the OpenLibrary API
+        await asyncio.sleep(0.5)
+    
+    return {
+        "total_books": total,
+        "successful": success,
+        "failed": failed,
+        "errors": errors
+    }
