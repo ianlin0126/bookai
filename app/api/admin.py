@@ -85,45 +85,36 @@ async def update_book(
             book.author_id = new_author.id
         elif book_update.author is not None:
             # Update existing author's name
-            await db.execute(
-                update(Author)
-                .where(Author.id == book.author_id)
-                .values(name=book_update.author)
+            result = await db.execute(
+                select(Author).where(Author.id == book.author_id)
             )
+            author = result.scalars().first()
+            if author:
+                author.name = book_update.author
 
-        # Build update dict for book fields
+        # Update book fields
         update_data = book_update.dict(
             exclude={'author', 'author_key'},  # Exclude author fields
             exclude_unset=True
         )
-
-        if update_data:
-            # Update the book
-            await db.execute(
-                update(Book)
-                .where(Book.id == book_id)
-                .values(**update_data)
-            )
+        
+        # Update book attributes directly
+        for field, value in update_data.items():
+            setattr(book, field, value)
 
         await db.commit()
-
-        # Get updated book with author
-        result = await db.execute(
-            select(Book).where(Book.id == book_id)
-        )
-        updated_book = result.scalars().first()
         
         return {
             "message": "Book updated successfully",
             "book": {
-                "id": updated_book.id,
-                "title": updated_book.title,
-                "author": updated_book.author_str,
-                "author_key": updated_book.author.open_library_key,
-                "summary": updated_book.summary,
-                "questions_and_answers": updated_book.questions_and_answers,
-                "affiliate_links": updated_book.affiliate_links,
-                "cover_image_url": updated_book.cover_image_url
+                "id": book.id,
+                "title": book.title,
+                "author": book.author_str,
+                "author_key": book.author.open_library_key,
+                "summary": book.summary,
+                "questions_and_answers": book.questions_and_answers,
+                "affiliate_links": book.affiliate_links,
+                "cover_image_url": book.cover_image_url
             }
         }
     except HTTPException:
