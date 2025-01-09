@@ -105,6 +105,10 @@ class ImageCache:
         if not original_url:
             return ""
             
+        # If URL is already in cached format, return as is
+        if original_url.startswith('/cache/images/'):
+            return original_url
+            
         try:
             # Try to get cached path
             cached_path = await self.get_cached_image_path(original_url)
@@ -115,7 +119,7 @@ class ImageCache:
                 return f"/cache/images/{filename}"
             
             # If not cached and we should cache it
-            if cache_if_missing:
+            if cache_if_missing and not original_url.startswith('/cache/'):
                 # Start caching in background
                 asyncio.create_task(self.ensure_cached(original_url))
             
