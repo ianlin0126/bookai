@@ -97,7 +97,7 @@ try:
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     app.mount("/js", StaticFiles(directory=js_dir), name="js")
     app.mount("/css", StaticFiles(directory=css_dir), name="css")
-    app.mount("/cache", StaticFiles(directory=cache_dir), name="cache")
+    app.mount("/cache/images", StaticFiles(directory=cache_images_dir), name="cache_images")
     
     # Configure templates
     templates = Jinja2Templates(directory=str(base_dir / "app" / "templates"))
