@@ -107,23 +107,43 @@ class ImageCache:
             
         # If URL is already in cached format, return as is
         if original_url.startswith('/cache/images/'):
+            logger.info(f"URL already in cache format: {original_url}")
+            # Check if the file actually exists
+            cache_path = self.cache_dir / Path(original_url).name
+            if not cache_path.exists():
+                logger.warning(f"Cache file does not exist: {cache_path}")
+                # Extract original URL from database and try to cache it
+                try:
+                    # Start caching in background
+                    logger.info(f"Starting background caching for missing file: {original_url}")
+                    asyncio.create_task(self.ensure_cached(original_url))
+                except Exception as e:
+                    logger.error(f"Error starting cache task: {str(e)}")
             return original_url
             
         try:
             # Try to get cached path
             cached_path = await self.get_cached_image_path(original_url)
+            logger.info(f"Cached path for {original_url}: {cached_path}")
             
             if cached_path:
                 # Convert to URL path - always use /cache/images/
                 filename = Path(cached_path).name
-                return f"/cache/images/{filename}"
+                cached_url = f"/cache/images/{filename}"
+                logger.info(f"Generated cached URL: {cached_url}")
+                return cached_url
             
             # If not cached and we should cache it
             if cache_if_missing and not original_url.startswith('/cache/'):
-                # Start caching in background
-                asyncio.create_task(self.ensure_cached(original_url))
+                # Start caching immediately instead of in background
+                logger.info(f"Starting immediate caching for: {original_url}")
+                cached_path = await self.ensure_cached(original_url)
+                if cached_path:
+                    filename = Path(cached_path).name
+                    return f"/cache/images/{filename}"
+                logger.warning(f"Failed to cache image: {original_url}")
             
-            # Return original URL while caching happens
+            # Return original URL if caching failed
             return original_url
             
         except Exception as e:

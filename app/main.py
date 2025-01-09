@@ -88,9 +88,19 @@ css_dir = static_dir / "css"
 cache_dir = static_dir / "cache"
 cache_images_dir = cache_dir / "images"
 
+logger.info(f"Base directory: {base_dir}")
+logger.info(f"Static directory: {static_dir}")
+logger.info(f"Cache images directory: {cache_images_dir}")
+
 # Create directories if they don't exist
 for directory in [static_dir, js_dir, css_dir, cache_dir, cache_images_dir]:
-    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created/verified directory: {directory}")
+        # Log directory permissions
+        logger.info(f"Directory permissions for {directory}: {oct(directory.stat().st_mode)[-3:]}")
+    except Exception as e:
+        logger.error(f"Error creating directory {directory}: {str(e)}")
 
 try:
     # Mount static directories
@@ -98,6 +108,7 @@ try:
     app.mount("/js", StaticFiles(directory=js_dir), name="js")
     app.mount("/css", StaticFiles(directory=css_dir), name="css")
     app.mount("/cache/images", StaticFiles(directory=cache_images_dir), name="cache_images")
+    logger.info("Successfully mounted all static directories")
     
     # Configure templates
     templates = Jinja2Templates(directory=str(base_dir / "app" / "templates"))
