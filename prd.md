@@ -1,4 +1,4 @@
-# BookDigest.ai PRD
+# Books AI PRD
 
 # Problem
 
