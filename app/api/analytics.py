@@ -17,7 +17,7 @@ async def record_visit(book_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/popular", response_model=List[Dict[str, Any]])
 async def get_popular_books(
-    days: int = Query(7, ge=1, description="Number of days to look back"),
+    days: int = Query(365, ge=1, description="Number of days to look back"),
     limit: int = Query(12, ge=1, le=50, description="Maximum number of books to return"),
     page: Optional[int] = Query(None, ge=1, description="Page number (enables pagination if provided)"),
     per_page: Optional[int] = Query(None, ge=1, le=50, description="Items per page (required if page is provided)"),
