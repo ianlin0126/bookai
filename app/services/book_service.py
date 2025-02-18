@@ -317,8 +317,9 @@ async def refresh_book_cover(db: AsyncSession, book_id: int) -> models.Book:
             if not cached_url or cached_url == cover_url:
                 raise ValueError(f"Failed to cache image from {cover_url}")
                 
-            # Update book's cover URL
+            # Update book's cover URLs
             book.cover_image_url = cached_url
+            book.cover_image_open_library_url = cover_url
             await db.commit()
             
             return await _process_book_for_response(book)

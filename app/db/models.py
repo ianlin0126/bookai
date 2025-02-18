@@ -16,6 +16,7 @@ class Book(Base):
     author_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
     open_library_key = Column(String, nullable=False, unique=True, index=True)
     _image_url = Column("cover_image_url", String, nullable=True)  # Actual database column
+    cover_image_open_library_url = Column(String, nullable=True)
     publication_year = Column(Integer)
     summary = Column(Text, nullable=True)
     questions_and_answers = Column(Text, nullable=True)

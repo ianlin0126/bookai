@@ -24,6 +24,7 @@ class BookBase(BaseModel):
     title: str
     open_library_key: Optional[str] = None
     cover_image_url: Optional[str] = None
+    cover_image_open_library_url: Optional[str] = None
     summary: Optional[str] = None
     questions_and_answers: Optional[str] = None
     affiliate_links: Optional[str] = None
